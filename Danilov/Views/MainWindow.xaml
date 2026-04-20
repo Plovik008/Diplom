@@ -1,0 +1,134 @@
+﻿<Window x:Class="MuseumAccountingSystem.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Музей вуза - Система учета экспонатов" 
+        Height="700" Width="1200"
+        WindowStartupLocation="CenterScreen"
+        WindowState="Maximized">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="#1A5276" Height="55">
+            <Grid>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="20,0,0,0">
+                    <TextBlock Text="🏛️" FontSize="24" Margin="0,0,10,0"/>
+                    <TextBlock Text="Музей вуза" 
+                               FontSize="18" 
+                               FontWeight="Bold" 
+                               Foreground="White"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text=" | Система учета экспонатов" 
+                               FontSize="12" 
+                               Foreground="#BDC3C7"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" 
+                            HorizontalAlignment="Center" 
+                            VerticalAlignment="Center">
+
+                    <Button Content="Экспонаты" 
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="55"
+                            Width="110"
+                            Cursor="Hand"
+                            FontSize="14"
+                            Click="MenuExhibits_Click"/>
+
+                    <Button Content="Выдача" 
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="55"
+                            Width="110"
+                            Cursor="Hand"
+                            FontSize="14"
+                            Click="MenuIssue_Click"/>
+
+                    <Button Content="Возврат" 
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="55"
+                            Width="110"
+                            Cursor="Hand"
+                            FontSize="14"
+                            Click="MenuReturn_Click"/>
+
+                    <Button Content="Журнал" 
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="55"
+                            Width="110"
+                            Cursor="Hand"
+                            FontSize="14"
+                            Click="MenuJournal_Click"/>
+
+                    <Button Content="Преподаватели" 
+                            Background="Transparent" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="55"
+                            Width="120"
+                            Cursor="Hand"
+                            FontSize="14"
+                            Click="MenuTeachers_Click"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" 
+                            HorizontalAlignment="Right" 
+                            VerticalAlignment="Center"
+                            Margin="0,0,20,0">
+
+                    <Border Background="#34495E" 
+                            CornerRadius="15" 
+                            Padding="10,5"
+                            Margin="0,0,15,0">
+                        <TextBlock x:Name="txtUserInfo" 
+                                   Foreground="White"
+                                   FontSize="12"/>
+                    </Border>
+
+                    <Button Content="Выход" 
+                            Background="#E74C3C" 
+                            Foreground="White"
+                            BorderThickness="0"
+                            Height="35"
+                            Width="80"
+                            Cursor="Hand"
+                            FontSize="13"
+                            Click="MenuExit_Click"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Background="#ECF0F1" Padding="15">
+            <Frame x:Name="MainFrame" NavigationUIVisibility="Hidden"/>
+        </Border>
+
+        <StatusBar Grid.Row="2" Background="#2C3E50" Height="28">
+            <StatusBarItem>
+                <TextBlock x:Name="txtStatus" 
+                           Foreground="White" 
+                           FontSize="11"
+                           Margin="10,0,0,0"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock Text="Готов к работе" 
+                           Foreground="#BDC3C7" 
+                           FontSize="11"
+                           Margin="0,0,10,0"/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

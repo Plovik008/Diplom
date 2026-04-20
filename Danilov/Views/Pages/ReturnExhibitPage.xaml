@@ -1,0 +1,49 @@
+﻿<Page x:Class="MuseumAccountingSystem.Views.Pages.ReturnExhibitPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Возврат экспоната"
+      Background="#ECF0F1">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Text="Возврат экспоната" FontSize="22" FontWeight="Bold" Foreground="#1A5276" Margin="0,0,0,20"/>
+
+        <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+            <StackPanel>
+                <TextBlock Text="Поиск" FontSize="14" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,5"/>
+                <TextBox x:Name="txtSearch" Height="35" TextChanged="TxtSearch_TextChanged"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+            <DataGrid x:Name="dgvIssuedExhibits" 
+                      AutoGenerateColumns="False"
+                      IsReadOnly="True"
+                      SelectionMode="Single"
+                      SelectionUnit="FullRow">
+
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="Инв. номер" Binding="{Binding ExhibitInventoryNumber}" Width="100"/>
+                    <DataGridTextColumn Header="Экспонат" Binding="{Binding ExhibitName}" Width="200"/>
+                    <DataGridTextColumn Header="Преподаватель" Binding="{Binding TeacherName}" Width="180"/>
+                    <DataGridTextColumn Header="Дата выдачи" Binding="{Binding IssueDate, StringFormat='dd.MM.yyyy'}" Width="100"/>
+                    <DataGridTextColumn Header="Срок возврата" Binding="{Binding PlannedReturnDate, StringFormat='dd.MM.yyyy'}" Width="100"/>
+                    <DataGridTextColumn Header="Цель" Binding="{Binding Purpose}" Width="150"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <Border Grid.Row="3" Background="White" CornerRadius="8" Padding="15">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="btnReturn" Content="ВЕРНУТЬ" Background="#27AE60" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Click="BtnReturn_Click"/>
+                <Button x:Name="btnRefresh" Content="Обновить" Background="#2980B9" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Margin="20,0,0,0" Click="BtnRefresh_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>

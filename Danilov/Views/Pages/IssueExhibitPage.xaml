@@ -1,0 +1,63 @@
+﻿<Page x:Class="MuseumAccountingSystem.Views.Pages.IssueExhibitPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Выдача экспоната"
+      Background="#ECF0F1">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Text="Выдача экспоната" FontSize="22" FontWeight="Bold" Foreground="#1A5276" Margin="0,0,0,20"/>
+
+            <Border Grid.Row="1" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Выберите экспонат" FontSize="14" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="cmbExhibit" Height="40"/>
+
+                    <Border Background="#ECF0F1" CornerRadius="5" Padding="10" Margin="0,10,0,0">
+                        <TextBlock x:Name="txtExhibitInfo" Text="Выберите экспонат из списка" FontSize="12" TextWrapping="Wrap"/>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="2" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Выберите преподавателя" FontSize="14" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,5"/>
+                    <ComboBox x:Name="cmbTeacher" Height="40"/>
+
+                    <Button x:Name="btnAddTeacher" Content="Добавить преподавателя" Background="#27AE60" Foreground="White" FontSize="12" Width="180" Height="30" HorizontalAlignment="Left" Margin="0,10,0,0" Click="BtnAddTeacher_Click"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="3" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Планируемая дата возврата" FontSize="14" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,5"/>
+                    <DatePicker x:Name="dpPlannedReturn" Height="40"/>
+                    <TextBlock x:Name="txtDateWarning" Foreground="#F39C12" FontSize="11" Visibility="Collapsed"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="4" Background="White" CornerRadius="8" Padding="15" Margin="0,0,0,20">
+                <StackPanel>
+                    <TextBlock Text="Цель выдачи" FontSize="14" FontWeight="SemiBold" Foreground="#2C3E50" Margin="0,0,0,5"/>
+                    <TextBox x:Name="txtPurposeDetail" Height="60" TextWrapping="Wrap" Text="Подробное описание цели"/>
+                </StackPanel>
+            </Border>
+
+            <Border Grid.Row="5" Background="White" CornerRadius="8" Padding="15">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="btnIssue" Content="ВЫДАТЬ" Background="#27AE60" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Click="BtnIssue_Click"/>
+                    <Button x:Name="btnCancel" Content="Отмена" Background="#E74C3C" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Margin="20,0,0,0" Click="BtnCancel_Click"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,72 @@
+﻿using System;
+using System.Windows;
+using MuseumAccountingSystem.Services;
+
+namespace MuseumAccountingSystem.Views
+{
+    public partial class LoginWindow : Window
+    {
+        private DatabaseService dbService;
+
+        public LoginWindow()
+        {
+            InitializeComponent();
+            dbService = new DatabaseService();
+        }
+
+        private void BtnLogin_Click(object sender, RoutedEventArgs e)
+        {
+            string username = txtUsername.Text.Trim();
+            string password = txtPassword.Text.Trim();
+
+            if (string.IsNullOrEmpty(username))
+            {
+                txtError.Text = "Введите логин";
+                txtError.Visibility = Visibility.Visible;
+                return;
+            }
+
+            if (string.IsNullOrEmpty(password))
+            {
+                txtError.Text = "Введите пароль";
+                txtError.Visibility = Visibility.Visible;
+                return;
+            }
+
+            btnLogin.IsEnabled = false;
+            btnLogin.Content = "Проверка...";
+            txtError.Visibility = Visibility.Collapsed;
+
+            try
+            {
+                var user = dbService.AuthenticateUser(username, password);
+
+                if (user != null)
+                {
+                    MainWindow mainWindow = new MainWindow(user);
+                    mainWindow.Show();
+                    this.Close();
+                }
+                else
+                {
+                    txtError.Text = "Неверный логин или пароль";
+                    txtError.Visibility = Visibility.Visible;
+                    btnLogin.IsEnabled = true;
+                    btnLogin.Content = "ВОЙТИ";
+                }
+            }
+            catch (Exception ex)
+            {
+                txtError.Text = "Ошибка: " + ex.Message;
+                txtError.Visibility = Visibility.Visible;
+                btnLogin.IsEnabled = true;
+                btnLogin.Content = "ВОЙТИ";
+            }
+        }
+
+        private void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+    }
+}
