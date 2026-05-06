@@ -15,5 +15,15 @@ namespace MuseumAccountingSystem.Models
         public DateTime? ActualReturnDate { get; set; }
         public string Purpose { get; set; }
         public string Status { get; set; }
+
+        public bool IsOverdue
+        {
+            get
+            {
+                if (Status == "Выдан" && PlannedReturnDate.Date < DateTime.Now.Date)
+                    return true;
+                return false;
+            }
+        }
     }
 }

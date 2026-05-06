@@ -11,11 +11,19 @@ namespace MuseumAccountingSystem.Views.Pages
     public partial class IssueExhibitPage : Page
     {
         private DatabaseService dbService;
+        private User currentUser;
 
-        public IssueExhibitPage(DatabaseService dbService)
+        public IssueExhibitPage(DatabaseService dbService, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
+            this.currentUser = currentUser;
+
+            if (currentUser.IsTeacher)
+            {
+                btnIssue.Visibility = Visibility.Collapsed;
+            }
+
             dpPlannedReturn.SelectedDate = DateTime.Now.AddDays(7);
             dpPlannedReturn.SelectedDateChanged += DpPlannedReturn_SelectedDateChanged;
             LoadData();
@@ -123,7 +131,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
             await System.Threading.Tasks.Task.Run(() =>
             {
-                dbService.IssueExhibit(exhibitId, teacherId, returnDate, purpose);
+                dbService.IssueExhibit(exhibitId, teacherId, returnDate, purpose, currentUser);
             });
 
             MessageBox.Show("Экспонат выдан");
@@ -140,7 +148,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
         private void BtnAddTeacher_Click(object sender, RoutedEventArgs e)
         {
-            TeacherEditPage page = new TeacherEditPage(dbService);
+            TeacherEditPage page = new TeacherEditPage(dbService, currentUser);
             page.TeacherSaved += (s, args) => LoadData();
             NavigationService.Navigate(page);
         }
@@ -148,6 +156,11 @@ namespace MuseumAccountingSystem.Views.Pages
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             NavigationService.GoBack();
+        }
+
+        private void cmbExhibit_SelectionChanged_1(object sender, SelectionChangedEventArgs e)
+        {
+
         }
     }
 }

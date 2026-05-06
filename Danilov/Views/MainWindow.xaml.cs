@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Input;
 using MuseumAccountingSystem.Models;
 using MuseumAccountingSystem.Services;
 using MuseumAccountingSystem.Views.Pages;
@@ -16,41 +17,191 @@ namespace MuseumAccountingSystem.Views
             currentUser = user;
             dbService = new DatabaseService();
 
-            string roleText = user.Role == "Admin" ? "👑 Администратор" : "👤 Пользователь";
+            string roleText = "";
+            if (user.Role == "Admin") roleText = "Администратор";
+            else if (user.Role == "Employee") roleText = "Сотрудник музея";
+            else if (user.Role == "Teacher") roleText = "Преподаватель";
+
             txtUserInfo.Text = $"{roleText} | {user.FullName}";
-            txtStatus.Text = "✅ Система готова к работе";
+            txtStatus.Text = "Система готова к работе";
+
+            if (user.IsAdmin)
+            {
+                btnLogs.Visibility = Visibility.Visible;
+            }
 
             MainFrame.Navigate(new ExhibitsListPage(dbService, currentUser));
+
+            this.ContentRendered += MainWindow_ContentRendered;
+            this.KeyDown += MainWindow_KeyDown;
+        }
+
+        private void MainWindow_ContentRendered(object sender, System.EventArgs e)
+        {
+            ShowOverdueNotifications();
+        }
+
+        private void MainWindow_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.F1)
+            {
+                ShowHelp();
+            }
+            else if (e.Key == Key.N && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                if (currentUser.IsAdmin)
+                {
+                    MainFrame.Navigate(new ExhibitEditPage(dbService, currentUser));
+                    txtStatus.Text = "Добавление нового экспоната";
+                }
+            }
+            else if (e.Key == Key.F5)
+            {
+                RefreshCurrentPage();
+                txtStatus.Text = "Данные обновлены";
+            }
+        }
+
+        private void ShowHelp()
+        {
+            string helpText = "Горячие клавиши:\n\nF1 - Справка\nCtrl+N - Новый экспонат\nF5 - Обновить\n\n";
+            helpText += $"Ваша роль: ";
+            if (currentUser.IsAdmin) helpText += "Администратор (полный доступ)";
+            else if (currentUser.IsEmployee) helpText += "Сотрудник музея (выдача и возврат)";
+            else helpText += "Преподаватель (только просмотр)";
+
+            MessageBox.Show(helpText, "Помощь", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        private void RefreshCurrentPage()
+        {
+            var currentPage = MainFrame.Content;
+            if (currentPage is ExhibitsListPage)
+            {
+                MainFrame.Navigate(new ExhibitsListPage(dbService, currentUser));
+            }
+            else if (currentPage is TeachersListPage)
+            {
+                MainFrame.Navigate(new TeachersListPage(dbService, currentUser));
+            }
+            else if (currentPage is IssuesJournalPage)
+            {
+                MainFrame.Navigate(new IssuesJournalPage(dbService, currentUser));
+            }
+            else if (currentPage is StatisticsPage)
+            {
+                MainFrame.Navigate(new StatisticsPage(dbService, currentUser));
+            }
+            else if (currentPage is CalendarPage)
+            {
+                MainFrame.Navigate(new CalendarPage(dbService));
+            }
+            else if (currentPage is IssueExhibitPage)
+            {
+                MainFrame.Navigate(new IssueExhibitPage(dbService, currentUser));
+            }
+            else if (currentPage is ReturnExhibitPage)
+            {
+                MainFrame.Navigate(new ReturnExhibitPage(dbService, currentUser));
+            }
+        }
+
+        private void ShowOverdueNotifications()
+        {
+            try
+            {
+                var currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
+                if (currentUser.IsTeacher && !currentTeacherId.HasValue)
+                    return;
+
+                var activeIssues = dbService.GetAllIssues(true, currentUser.IsTeacher ? currentTeacherId : null);
+                var overdueCount = 0;
+
+                foreach (var issue in activeIssues)
+                {
+                    if (issue.IsOverdue)
+                    {
+                        overdueCount++;
+                    }
+                }
+
+                if (overdueCount > 0)
+                {
+                    Dispatcher.BeginInvoke(new System.Action(() =>
+                    {
+                        var result = MessageBox.Show(this, $"Обнаружено {overdueCount} просроченных экспонатов.\nПоказать подробности?",
+                            "Внимание! Просроченные экспонаты",
+                            MessageBoxButton.YesNo,
+                            MessageBoxImage.Warning);
+
+                        if (result == MessageBoxResult.Yes)
+                        {
+                            NotificationsWindow notifications = new NotificationsWindow(dbService, this, currentUser);
+                            notifications.Owner = this;
+                            notifications.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+                            notifications.ShowDialog();
+                        }
+                    }));
+                }
+            }
+            catch (System.Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Ошибка: {ex.Message}");
+            }
+        }
+
+        public void NavigateToReturnPage()
+        {
+            MainFrame.Navigate(new ReturnExhibitPage(dbService, currentUser));
+            txtStatus.Text = "Возврат просроченных экспонатов";
         }
 
         private void MenuExhibits_Click(object sender, RoutedEventArgs e)
         {
             MainFrame.Navigate(new ExhibitsListPage(dbService, currentUser));
-            txtStatus.Text = "📋 Просмотр списка экспонатов";
+            txtStatus.Text = currentUser.IsTeacher ? "Просмотр страницы \"Мои выдачи\"" : "Просмотр списка экспонатов";
         }
 
         private void MenuIssue_Click(object sender, RoutedEventArgs e)
         {
-            MainFrame.Navigate(new IssueExhibitPage(dbService));
-            txtStatus.Text = "📤 Выдача экспоната преподавателю";
+            MainFrame.Navigate(new IssueExhibitPage(dbService, currentUser));
+            txtStatus.Text = "Выдача экспоната преподавателю";
         }
 
         private void MenuReturn_Click(object sender, RoutedEventArgs e)
         {
-            MainFrame.Navigate(new ReturnExhibitPage(dbService));
-            txtStatus.Text = "📥 Возврат экспоната в музей";
+            MainFrame.Navigate(new ReturnExhibitPage(dbService, currentUser));
+            txtStatus.Text = "Возврат экспоната в музей";
         }
 
         private void MenuJournal_Click(object sender, RoutedEventArgs e)
         {
-            MainFrame.Navigate(new IssuesJournalPage(dbService));
-            txtStatus.Text = "📊 Просмотр журнала выдачи";
+            MainFrame.Navigate(new IssuesJournalPage(dbService, currentUser));
+            txtStatus.Text = currentUser.IsTeacher ? "Просмотр своего журнала выдачи" : "Просмотр журнала выдачи";
         }
 
         private void MenuTeachers_Click(object sender, RoutedEventArgs e)
         {
             MainFrame.Navigate(new TeachersListPage(dbService, currentUser));
-            txtStatus.Text = "👨‍🏫 Управление списком преподавателей";
+            txtStatus.Text = "Управление списком преподавателей";
+        }
+
+        private void MenuStatistics_Click(object sender, RoutedEventArgs e)
+        {
+            MainFrame.Navigate(new StatisticsPage(dbService, currentUser));
+            txtStatus.Text = currentUser.IsTeacher ? "Просмотр своей статистики" : "Просмотр статистики и отчетов";
+        }
+
+        private void MenuCalendar_Click(object sender, RoutedEventArgs e)
+        {
+            MainFrame.Navigate(new CalendarPage(dbService));
+            txtStatus.Text = "Просмотр календаря возвратов";
+        }
+
+        private void MenuLogs_Click(object sender, RoutedEventArgs e)
+        {
+            MainFrame.Navigate(new LogsPage(dbService));
+            txtStatus.Text = "Просмотр журнала действий";
         }
 
         private void MenuExit_Click(object sender, RoutedEventArgs e)

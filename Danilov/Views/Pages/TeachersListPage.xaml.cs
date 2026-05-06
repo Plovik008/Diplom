@@ -19,12 +19,19 @@ namespace MuseumAccountingSystem.Views.Pages
             this.dbService = dbService;
             this.currentUser = currentUser;
             LoadTeachers();
+
+            if (!currentUser.IsAdmin)
+            {
+                btnAdd.Visibility = Visibility.Collapsed;
+                btnEdit.Visibility = Visibility.Collapsed;
+                btnDelete.Visibility = Visibility.Collapsed;
+            }
         }
 
         private void LoadTeachers()
         {
             allTeachers = dbService.GetAllTeachers();
-            dgvTeachers.ItemsSource = allTeachers;
+            ApplySearch();
         }
 
         private void ApplySearch()
@@ -60,7 +67,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
-            TeacherEditPage page = new TeacherEditPage(dbService);
+            TeacherEditPage page = new TeacherEditPage(dbService, currentUser);
             page.TeacherSaved += (s, args) => LoadTeachers();
             NavigationService.Navigate(page);
         }
@@ -74,7 +81,7 @@ namespace MuseumAccountingSystem.Views.Pages
             }
 
             Teacher teacher = (Teacher)dgvTeachers.SelectedItem;
-            TeacherEditPage page = new TeacherEditPage(dbService, teacher.Id);
+            TeacherEditPage page = new TeacherEditPage(dbService, currentUser, teacher.Id);
             page.TeacherSaved += (s, args) => LoadTeachers();
             NavigationService.Navigate(page);
         }
@@ -93,7 +100,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
             if (result == MessageBoxResult.Yes)
             {
-                await System.Threading.Tasks.Task.Run(() => dbService.DeleteTeacher(teacher.Id));
+                await System.Threading.Tasks.Task.Run(() => dbService.DeleteTeacher(teacher.Id, currentUser));
                 LoadTeachers();
                 MessageBox.Show("Преподаватель удален");
             }

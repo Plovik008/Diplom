@@ -11,19 +11,36 @@ namespace MuseumAccountingSystem.Views.Pages
     public partial class ReturnExhibitPage : Page
     {
         private DatabaseService dbService;
+        private User currentUser;
         private List<Issue> activeIssues;
         private List<Issue> filteredIssues;
+        private int? currentTeacherId;
 
-        public ReturnExhibitPage(DatabaseService dbService)
+        public ReturnExhibitPage(DatabaseService dbService, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
+            this.currentUser = currentUser;
+            currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
+
+            if (currentUser.IsTeacher)
+            {
+                btnReturn.Visibility = Visibility.Collapsed;
+            }
+
             LoadData();
         }
 
         private void LoadData()
         {
-            activeIssues = dbService.GetAllIssues(true);
+            if (currentUser.IsTeacher && !currentTeacherId.HasValue)
+            {
+                activeIssues = new List<Issue>();
+            }
+            else
+            {
+                activeIssues = dbService.GetAllIssues(true, currentUser.IsTeacher ? currentTeacherId : null);
+            }
             filteredIssues = new List<Issue>(activeIssues);
             dgvIssuedExhibits.ItemsSource = filteredIssues;
         }
@@ -67,7 +84,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
             await System.Threading.Tasks.Task.Run(() =>
             {
-                dbService.ReturnExhibit(issue.Id);
+                dbService.ReturnExhibit(issue.Id, currentUser);
             });
 
             MessageBox.Show("Экспонат возвращен");

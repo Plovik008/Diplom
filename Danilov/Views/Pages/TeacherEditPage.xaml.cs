@@ -9,13 +9,15 @@ namespace MuseumAccountingSystem.Views.Pages
     public partial class TeacherEditPage : Page
     {
         private DatabaseService dbService;
+        private User currentUser;
         private int editId = -1;
         public event EventHandler TeacherSaved;
 
-        public TeacherEditPage(DatabaseService dbService, int id = -1)
+        public TeacherEditPage(DatabaseService dbService, User currentUser, int id = -1)
         {
             InitializeComponent();
             this.dbService = dbService;
+            this.currentUser = currentUser;
             this.editId = id;
 
             if (id == -1)
@@ -61,9 +63,9 @@ namespace MuseumAccountingSystem.Views.Pages
             await System.Threading.Tasks.Task.Run(() =>
             {
                 if (editId == -1)
-                    dbService.AddTeacher(teacher);
+                    dbService.AddTeacher(teacher, currentUser);
                 else
-                    dbService.UpdateTeacher(teacher);
+                    dbService.UpdateTeacher(teacher, currentUser);
             });
 
             MessageBox.Show("Преподаватель сохранен");

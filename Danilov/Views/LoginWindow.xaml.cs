@@ -45,7 +45,7 @@ namespace MuseumAccountingSystem.Views
                 {
                     MainWindow mainWindow = new MainWindow(user);
                     mainWindow.Show();
-                    this.Close();
+                    this.Hide();
                 }
                 else
                 {

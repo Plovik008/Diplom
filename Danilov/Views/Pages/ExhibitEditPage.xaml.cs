@@ -12,14 +12,16 @@ namespace MuseumAccountingSystem.Views.Pages
     public partial class ExhibitEditPage : Page
     {
         private DatabaseService dbService;
+        private User currentUser;
         private int editId = -1;
         private string photoPath = "";
         public event EventHandler ExhibitSaved;
 
-        public ExhibitEditPage(DatabaseService dbService, int id = -1)
+        public ExhibitEditPage(DatabaseService dbService, User currentUser, int id = -1)
         {
             InitializeComponent();
             this.dbService = dbService;
+            this.currentUser = currentUser;
             this.editId = id;
 
             if (id == -1)
@@ -71,6 +73,48 @@ namespace MuseumAccountingSystem.Views.Pages
                 else
                 {
                     cmbLocation.SelectedIndex = 0;
+                }
+
+                txtCost.Text = ex.Cost.ToString();
+
+                if (ex.YearOfOrigin.HasValue)
+                    txtYearOfOrigin.Text = ex.YearOfOrigin.Value.ToString();
+
+                if (ex.LastRestorationDate.HasValue)
+                    dpLastRestoration.SelectedDate = ex.LastRestorationDate.Value;
+
+                if (!string.IsNullOrEmpty(ex.ResponsiblePerson))
+                {
+                    bool found = false;
+                    for (int i = 0; i < cmbResponsiblePerson.Items.Count; i++)
+                    {
+                        ComboBoxItem item = cmbResponsiblePerson.Items[i] as ComboBoxItem;
+                        if (item != null && item.Content.ToString() == ex.ResponsiblePerson)
+                        {
+                            cmbResponsiblePerson.SelectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                        cmbResponsiblePerson.Text = ex.ResponsiblePerson;
+                }
+
+                if (!string.IsNullOrEmpty(ex.Source))
+                {
+                    bool found = false;
+                    for (int i = 0; i < cmbSource.Items.Count; i++)
+                    {
+                        ComboBoxItem item = cmbSource.Items[i] as ComboBoxItem;
+                        if (item != null && item.Content.ToString() == ex.Source)
+                        {
+                            cmbSource.SelectedIndex = i;
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found)
+                        cmbSource.Text = ex.Source;
                 }
 
                 if (!string.IsNullOrEmpty(ex.PhotoPath) && File.Exists(ex.PhotoPath))
@@ -139,12 +183,29 @@ namespace MuseumAccountingSystem.Views.Pages
 
             exhibit.PhotoPath = finalPhoto;
 
+            decimal cost = 0;
+            decimal.TryParse(txtCost.Text, out cost);
+            exhibit.Cost = cost;
+
+            int year = 0;
+            if (int.TryParse(txtYearOfOrigin.Text, out year))
+                exhibit.YearOfOrigin = year;
+
+            if (dpLastRestoration.SelectedDate.HasValue)
+                exhibit.LastRestorationDate = dpLastRestoration.SelectedDate.Value;
+
+            ComboBoxItem responsibleItem = cmbResponsiblePerson.SelectedItem as ComboBoxItem;
+            exhibit.ResponsiblePerson = responsibleItem != null ? responsibleItem.Content.ToString() : cmbResponsiblePerson.Text;
+
+            ComboBoxItem sourceItem = cmbSource.SelectedItem as ComboBoxItem;
+            exhibit.Source = sourceItem != null ? sourceItem.Content.ToString() : cmbSource.Text;
+
             await System.Threading.Tasks.Task.Run(() =>
             {
                 if (editId == -1)
-                    dbService.AddExhibit(exhibit);
+                    dbService.AddExhibit(exhibit, currentUser);
                 else
-                    dbService.UpdateExhibit(exhibit);
+                    dbService.UpdateExhibit(exhibit, currentUser);
             });
 
             MessageBox.Show("Экспонат сохранен");
