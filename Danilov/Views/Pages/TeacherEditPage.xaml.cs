@@ -60,17 +60,24 @@ namespace MuseumAccountingSystem.Views.Pages
             teacher.Email = txtEmail.Text;
             teacher.Phone = txtPhone.Text;
 
-            await System.Threading.Tasks.Task.Run(() =>
+            try
             {
-                if (editId == -1)
-                    dbService.AddTeacher(teacher, currentUser);
-                else
-                    dbService.UpdateTeacher(teacher, currentUser);
-            });
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    if (editId == -1)
+                        dbService.AddTeacher(teacher, currentUser);
+                    else
+                        dbService.UpdateTeacher(teacher, currentUser);
+                });
 
-            MessageBox.Show("Преподаватель сохранен");
-            TeacherSaved?.Invoke(this, EventArgs.Empty);
-            NavigationService.GoBack();
+                MessageBox.Show("Преподаватель сохранен");
+                TeacherSaved?.Invoke(this, EventArgs.Empty);
+                NavigationService.GoBack();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message, "Ошибка", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)

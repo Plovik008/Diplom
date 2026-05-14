@@ -17,13 +17,14 @@ namespace MuseumAccountingSystem.Views.Pages
         private CsvExportService csvExport;
         private int? currentTeacherId;
 
-        public StatisticsPage(DatabaseService dbService, User currentUser)
+public StatisticsPage(DatabaseService dbService, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
             this.currentUser = currentUser;
             csvExport = new CsvExportService();
             currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
+            dbService.DataChanged += OnDataChanged;
 
             if (currentUser.IsTeacher)
             {
@@ -33,6 +34,11 @@ namespace MuseumAccountingSystem.Views.Pages
             }
 
             LoadStatistics();
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() => LoadStatistics()));
         }
 
         private void LoadStatistics()

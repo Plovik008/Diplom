@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using MuseumAccountingSystem.Models;
 using MuseumAccountingSystem.Services;
+using MuseumAccountingSystem.Views;
 
 namespace MuseumAccountingSystem.Views.Pages
 {
@@ -28,6 +29,8 @@ namespace MuseumAccountingSystem.Views.Pages
             csvExport = new CsvExportService();
             currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
 
+            dbService.DataChanged += OnDataChanged;
+
             if (!currentUser.IsAdmin && !currentUser.IsEmployee)
             {
                 btnAdd.Visibility = Visibility.Collapsed;
@@ -40,6 +43,17 @@ namespace MuseumAccountingSystem.Views.Pages
             cmbStatusFilter.SelectionChanged += CmbStatusFilter_SelectionChanged;
 
             LoadExhibits();
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Text = "";
+                cmbStatusFilter.SelectedIndex = 0;
+                currentPage = 1;
+                LoadExhibits();
+            }));
         }
 
         private void LoadExhibits()
@@ -120,8 +134,13 @@ namespace MuseumAccountingSystem.Views.Pages
             if (filteredExhibits.Count == 0)
             {
                 totalPages = 1;
+                currentPage = 1;
                 dgvExhibits.ItemsSource = filteredExhibits;
                 txtPageInfo.Text = "Страница 0 из 0 (всего 0 записей)";
+                btnFirst.IsEnabled = false;
+                btnPrev.IsEnabled = false;
+                btnNext.IsEnabled = false;
+                btnLast.IsEnabled = false;
                 return;
             }
 
@@ -134,7 +153,14 @@ namespace MuseumAccountingSystem.Views.Pages
             var pagedData = filteredExhibits.Skip((currentPage - 1) * pageSize).Take(pageSize).ToList();
             dgvExhibits.ItemsSource = pagedData;
 
-            txtPageInfo.Text = $"Страница {currentPage} из {totalPages} (всего {filteredExhibits.Count} записей)";
+            int startRecord = (currentPage - 1) * pageSize + 1;
+            int endRecord = Math.Min(currentPage * pageSize, filteredExhibits.Count);
+            txtPageInfo.Text = $"Записи {startRecord}-{endRecord} из {filteredExhibits.Count} (страница {currentPage} из {totalPages})";
+
+            btnFirst.IsEnabled = currentPage > 1;
+            btnPrev.IsEnabled = currentPage > 1;
+            btnNext.IsEnabled = currentPage < totalPages;
+            btnLast.IsEnabled = currentPage < totalPages;
         }
 
         private void BtnExport_Click(object sender, RoutedEventArgs e)
@@ -180,6 +206,44 @@ namespace MuseumAccountingSystem.Views.Pages
             ApplyFilters();
         }
 
+        private void BtnPhotos_Click(object sender, RoutedEventArgs e)
+        {
+            var btn = sender as Button;
+            if (btn?.Tag is Exhibit exhibit)
+            {
+                List<string> photos = new List<string>();
+
+                if (exhibit.PhotoPaths != null && exhibit.PhotoPaths.Count > 0)
+                {
+                    foreach (var path in exhibit.PhotoPaths)
+                    {
+                        if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                        {
+                            photos.Add(path);
+                        }
+                    }
+                }
+                else if (!string.IsNullOrEmpty(exhibit.PhotoPath) && System.IO.File.Exists(exhibit.PhotoPath))
+                {
+                    photos.Add(exhibit.PhotoPath);
+                }
+
+                if (photos.Count > 0)
+                {
+                    PhotoViewerWindow viewer = new PhotoViewerWindow(exhibit.Name, photos);
+                    viewer.Owner = Window.GetWindow(this);
+                    viewer.ShowDialog();
+                }
+                else
+                {
+                    MessageBox.Show("Фотография не найдена.");
+                }
+            }
+            else
+            {
+                MessageBox.Show("Экспонат не выбран.");
+            }
+        }
         private void BtnRefresh_Click(object sender, RoutedEventArgs e)
         {
             txtSearch.Text = "";

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -18,6 +19,7 @@ namespace MuseumAccountingSystem.Views.Pages
             InitializeComponent();
             this.dbService = dbService;
             this.currentUser = currentUser;
+            dbService.DataChanged += OnDataChanged;
             LoadTeachers();
 
             if (!currentUser.IsAdmin)
@@ -26,6 +28,15 @@ namespace MuseumAccountingSystem.Views.Pages
                 btnEdit.Visibility = Visibility.Collapsed;
                 btnDelete.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Text = "";
+                LoadTeachers();
+            }));
         }
 
         private void LoadTeachers()

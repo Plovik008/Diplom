@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using System;
+using System.Windows;
 using System.Windows.Input;
 using MuseumAccountingSystem.Models;
 using MuseumAccountingSystem.Services;
@@ -13,9 +14,13 @@ namespace MuseumAccountingSystem.Views
 
         public MainWindow(User user)
         {
-            InitializeComponent();
-            currentUser = user;
-            dbService = new DatabaseService();
+            try
+            {
+                InitializeComponent();
+                currentUser = user;
+                dbService = new DatabaseService();
+
+                dbService.CleanupOrphanedPhotos();
 
             string roleText = "";
             if (user.Role == "Admin") roleText = "Администратор";
@@ -25,15 +30,36 @@ namespace MuseumAccountingSystem.Views
             txtUserInfo.Text = $"{roleText} | {user.FullName}";
             txtStatus.Text = "Система готова к работе";
 
+            if (user.IsTeacher)
+            {
+                btnIssue.Visibility = Visibility.Collapsed;
+                btnTeachers.Visibility = Visibility.Collapsed;
+                btnStatistics.Visibility = Visibility.Collapsed;
+            }
+
             if (user.IsAdmin)
             {
+                logsSeparator.Visibility = Visibility.Visible;
+                btnLogs.Visibility = Visibility.Visible;
+                backupSeparator.Visibility = Visibility.Visible;
+                btnBackup.Visibility = Visibility.Visible;
+            }
+            else if (user.IsEmployee)
+            {
+                logsSeparator.Visibility = Visibility.Visible;
                 btnLogs.Visibility = Visibility.Visible;
             }
 
             MainFrame.Navigate(new ExhibitsListPage(dbService, currentUser));
 
             this.ContentRendered += MainWindow_ContentRendered;
-            this.KeyDown += MainWindow_KeyDown;
+                this.KeyDown += MainWindow_KeyDown;
+            }
+            catch (System.Exception ex)
+            {
+                MessageBox.Show("Ошибка в конструкторе MainWindow:\n" + ex.Message + "\n\nStackTrace:\n" + ex.StackTrace,
+                    "Критическая ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void MainWindow_ContentRendered(object sender, System.EventArgs e)
@@ -110,11 +136,14 @@ namespace MuseumAccountingSystem.Views
         {
             try
             {
-                var currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
-                if (currentUser.IsTeacher && !currentTeacherId.HasValue)
+                if (!currentUser.IsTeacher)
                     return;
 
-                var activeIssues = dbService.GetAllIssues(true, currentUser.IsTeacher ? currentTeacherId : null);
+                var currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
+                if (!currentTeacherId.HasValue)
+                    return;
+
+                var activeIssues = dbService.GetAllIssues(true, currentTeacherId);
                 var overdueCount = 0;
 
                 foreach (var issue in activeIssues)
@@ -146,7 +175,11 @@ namespace MuseumAccountingSystem.Views
             }
             catch (System.Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Ошибка: {ex.Message}");
+                MessageBox.Show(this,
+                    $"Ошибка при загрузке просроченных экспонатов: {ex.Message}",
+                    "Ошибка",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
             }
         }
 
@@ -202,6 +235,36 @@ namespace MuseumAccountingSystem.Views
         {
             MainFrame.Navigate(new LogsPage(dbService));
             txtStatus.Text = "Просмотр журнала действий";
+        }
+
+        private void MenuBackup_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var dialog = new System.Windows.Forms.FolderBrowserDialog();
+                dialog.Description = "Выберите папку для сохранения резервной копии";
+
+                if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    var result = MessageBox.Show("Создать резервную копию базы данных?", 
+                        "Резервная копия", MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.Yes)
+                    {
+                        string backupFile = dbService.BackupDatabase(dialog.SelectedPath);
+                        if (backupFile != null)
+                        {
+                            MessageBox.Show($"Резервная копия создана:\n{backupFile}", 
+                                "Успех", MessageBoxButton.OK, MessageBoxImage.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при создании резервной копии: {ex.Message}", 
+                    "Ошибка", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
         private void MenuExit_Click(object sender, RoutedEventArgs e)

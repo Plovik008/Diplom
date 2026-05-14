@@ -16,7 +16,7 @@ namespace MuseumAccountingSystem.Views
         private User currentUser;
         private int? currentTeacherId;
 
-        public NotificationsWindow(DatabaseService dbService, MainWindow mainWindow, User currentUser)
+public NotificationsWindow(DatabaseService dbService, MainWindow mainWindow, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
@@ -24,10 +24,7 @@ namespace MuseumAccountingSystem.Views
             this.currentUser = currentUser;
             currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
 
-            if (currentUser.IsTeacher)
-            {
-                btnGoToReturn.Visibility = Visibility.Collapsed;
-            }
+            btnGoToReturn.Visibility = Visibility.Collapsed;
 
             LoadOverdueIssues();
         }
@@ -36,7 +33,7 @@ namespace MuseumAccountingSystem.Views
         {
             try
             {
-                if (currentUser.IsTeacher && !currentTeacherId.HasValue)
+                if (!currentUser.IsTeacher || !currentTeacherId.HasValue)
                 {
                     overdueIssues = new List<Issue>();
                     dgvOverdueIssues.ItemsSource = new List<OverdueItem>();
@@ -44,7 +41,7 @@ namespace MuseumAccountingSystem.Views
                     return;
                 }
 
-                var activeIssues = dbService.GetAllIssues(true, currentUser.IsTeacher ? currentTeacherId : null);
+                var activeIssues = dbService.GetAllIssues(true, currentTeacherId);
                 overdueIssues = new List<Issue>();
 
                 foreach (var issue in activeIssues)

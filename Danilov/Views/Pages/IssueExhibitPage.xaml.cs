@@ -10,14 +10,16 @@ namespace MuseumAccountingSystem.Views.Pages
 {
     public partial class IssueExhibitPage : Page
     {
-        private DatabaseService dbService;
+private DatabaseService dbService;
         private User currentUser;
+        private int selectedExhibitVersion = 0;
 
         public IssueExhibitPage(DatabaseService dbService, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
             this.currentUser = currentUser;
+            dbService.DataChanged += OnDataChanged;
 
             if (currentUser.IsTeacher)
             {
@@ -31,8 +33,14 @@ namespace MuseumAccountingSystem.Views.Pages
             cmbExhibit.SelectionChanged += CmbExhibit_SelectionChanged;
         }
 
-        private void LoadData()
+        private void OnDataChanged(object sender, EventArgs e)
         {
+            Dispatcher.BeginInvoke(new Action(() => LoadData()));
+        }
+
+private void LoadData()
+        {
+            selectedExhibitVersion = 0;
             try
             {
                 List<Exhibit> allExhibits = dbService.GetAllExhibits();
@@ -65,10 +73,12 @@ namespace MuseumAccountingSystem.Views.Pages
         {
             if (cmbExhibit.SelectedItem is Exhibit exhibit)
             {
+                selectedExhibitVersion = exhibit.DataVersion;
                 txtExhibitInfo.Text = $"Инв. номер: {exhibit.InventoryNumber}\nКатегория: {exhibit.Category ?? "Не указана"}\nМатериал: {exhibit.Material ?? "Не указан"}\nСостояние: {exhibit.Condition ?? "Не указано"}\nМестоположение: {exhibit.Location ?? "Не указано"}";
             }
             else
             {
+                selectedExhibitVersion = 0;
                 txtExhibitInfo.Text = "Выберите экспонат из списка";
             }
         }
@@ -118,6 +128,13 @@ namespace MuseumAccountingSystem.Views.Pages
             }
 
             int exhibitId = (int)cmbExhibit.SelectedValue;
+            int currentVersion = dbService.GetExhibitVersion(exhibitId);
+            if (currentVersion != selectedExhibitVersion)
+            {
+                MessageBox.Show("Данные экспоната были изменены другим пользователем. Пожалуйста, выберите экспонат заново.", "Конфликт данных", MessageBoxButton.OK, MessageBoxImage.Warning);
+                LoadData();
+                return;
+            }
             int teacherId = (int)cmbTeacher.SelectedValue;
             DateTime returnDate = dpPlannedReturn.SelectedDate.Value;
             string purpose = txtPurposeDetail.Text;

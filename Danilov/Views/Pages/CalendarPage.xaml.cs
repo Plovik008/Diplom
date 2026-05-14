@@ -20,7 +20,13 @@ namespace MuseumAccountingSystem.Views.Pages
             InitializeComponent();
             this.dbService = dbService;
             currentDate = DateTime.Now;
+            dbService.DataChanged += OnDataChanged;
             LoadCalendar();
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() => LoadCalendar()));
         }
 
         private void LoadCalendar()

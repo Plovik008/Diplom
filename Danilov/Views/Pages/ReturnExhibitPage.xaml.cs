@@ -12,7 +12,7 @@ namespace MuseumAccountingSystem.Views.Pages
     {
         private DatabaseService dbService;
         private User currentUser;
-        private List<Issue> activeIssues;
+private List<Issue> activeIssues;
         private List<Issue> filteredIssues;
         private int? currentTeacherId;
 
@@ -22,6 +22,7 @@ namespace MuseumAccountingSystem.Views.Pages
             this.dbService = dbService;
             this.currentUser = currentUser;
             currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
+            dbService.DataChanged += OnDataChanged;
 
             if (currentUser.IsTeacher)
             {
@@ -31,7 +32,16 @@ namespace MuseumAccountingSystem.Views.Pages
             LoadData();
         }
 
-        private void LoadData()
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Text = "";
+                LoadData();
+            }));
+        }
+
+private void LoadData()
         {
             if (currentUser.IsTeacher && !currentTeacherId.HasValue)
             {

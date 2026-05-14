@@ -17,14 +17,25 @@ namespace MuseumAccountingSystem.Views.Pages
         private List<Issue> filteredIssues;
         private CsvExportService csvExport;
 
-        public IssuesJournalPage(DatabaseService dbService, User currentUser)
+public IssuesJournalPage(DatabaseService dbService, User currentUser)
         {
             InitializeComponent();
             this.dbService = dbService;
             this.currentUser = currentUser;
             currentTeacherId = dbService.GetTeacherIdByUser(currentUser);
             csvExport = new CsvExportService();
+            dbService.DataChanged += OnDataChanged;
             LoadData();
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Text = "";
+                cmbStatusFilter.SelectedIndex = 0;
+                LoadData();
+            }));
         }
 
         private void LoadData()

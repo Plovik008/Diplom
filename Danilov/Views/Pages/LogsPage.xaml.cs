@@ -18,7 +18,17 @@ namespace MuseumAccountingSystem.Views.Pages
         {
             InitializeComponent();
             this.dbService = dbService;
+            dbService.DataChanged += OnDataChanged;
             LoadData();
+        }
+
+        private void OnDataChanged(object sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Text = "";
+                LoadData();
+            }));
         }
 
         private void LoadData()

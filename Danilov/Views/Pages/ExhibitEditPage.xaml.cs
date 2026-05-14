@@ -1,5 +1,7 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media.Imaging;
@@ -14,7 +16,9 @@ namespace MuseumAccountingSystem.Views.Pages
         private DatabaseService dbService;
         private User currentUser;
         private int editId = -1;
-        private string photoPath = "";
+        private List<string> photoPaths = new List<string>();
+        private int selectedThumbnailIndex = -1;
+        private int originalDataVersion = 0;
         public event EventHandler ExhibitSaved;
 
         public ExhibitEditPage(DatabaseService dbService, User currentUser, int id = -1)
@@ -23,6 +27,9 @@ namespace MuseumAccountingSystem.Views.Pages
             this.dbService = dbService;
             this.currentUser = currentUser;
             this.editId = id;
+
+            LoadResponsiblePersons();
+            LoadLocations();
 
             if (id == -1)
             {
@@ -35,6 +42,34 @@ namespace MuseumAccountingSystem.Views.Pages
             }
         }
 
+        private void LoadLocations()
+        {
+            cmbLocation.Items.Clear();
+            var locations = dbService.GetLocations();
+            if (locations != null && locations.Count > 0)
+            {
+                foreach (var location in locations)
+                {
+                    cmbLocation.Items.Add(new ComboBoxItem { Content = location });
+                }
+            }
+            cmbLocation.SelectedIndex = 0;
+        }
+
+        private void LoadResponsiblePersons()
+        {
+            cmbResponsiblePerson.Items.Clear();
+            var teachers = dbService.GetAllTeachers();
+            if (teachers != null && teachers.Count > 0)
+            {
+                foreach (var teacher in teachers)
+                {
+                    cmbResponsiblePerson.Items.Add(new ComboBoxItem { Content = teacher.FullName });
+                }
+            }
+            
+        }
+
         private void LoadData()
         {
             var exhibits = dbService.GetAllExhibits();
@@ -42,6 +77,7 @@ namespace MuseumAccountingSystem.Views.Pages
 
             if (ex != null)
             {
+                originalDataVersion = ex.DataVersion;
                 txtInventoryNumber.Text = ex.InventoryNumber;
                 txtName.Text = ex.Name;
                 txtCategory.Text = ex.Category;
@@ -117,11 +153,75 @@ namespace MuseumAccountingSystem.Views.Pages
                         cmbSource.Text = ex.Source;
                 }
 
-                if (!string.IsNullOrEmpty(ex.PhotoPath) && File.Exists(ex.PhotoPath))
+                if (ex.PhotoPaths != null && ex.PhotoPaths.Count > 0)
                 {
-                    photoPath = ex.PhotoPath;
-                    imgPhoto.Source = new BitmapImage(new Uri(ex.PhotoPath));
+                    foreach (var path in ex.PhotoPaths)
+                    {
+                        if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                        {
+                            photoPaths.Add(path);
+                        }
+                    }
                 }
+                else if (!string.IsNullOrEmpty(ex.PhotoPath) && File.Exists(ex.PhotoPath))
+                {
+                    photoPaths.Add(ex.PhotoPath);
+                }
+
+                UpdatePhotoDisplay();
+            }
+        }
+
+        private void UpdatePhotoDisplay()
+        {
+            if (photoPaths.Count > 0)
+            {
+                txtNoPhoto.Visibility = Visibility.Collapsed;
+                lstPhotoThumbnails.ItemsSource = null;
+                lstPhotoThumbnails.ItemsSource = photoPaths;
+                if (selectedThumbnailIndex >= 0 && selectedThumbnailIndex < photoPaths.Count)
+                {
+                    ShowPhoto(selectedThumbnailIndex);
+                }
+                else
+                {
+                    ShowPhoto(0);
+                }
+            }
+            else
+            {
+                imgPhoto.Source = null;
+                lstPhotoThumbnails.ItemsSource = null;
+                txtNoPhoto.Visibility = Visibility.Visible;
+            }
+        }
+
+        private void ShowPhoto(int index)
+        {
+            if (index < 0 || index >= photoPaths.Count)
+                return;
+
+            selectedThumbnailIndex = index;
+            try
+            {
+                string path = photoPaths[index];
+                if (File.Exists(path))
+                {
+                    BitmapImage bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(path);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    imgPhoto.Source = bitmap;
+                }
+                else
+                {
+                    imgPhoto.Source = null;
+                }
+            }
+            catch
+            {
+                imgPhoto.Source = null;
             }
         }
 
@@ -129,66 +229,166 @@ namespace MuseumAccountingSystem.Views.Pages
         {
             OpenFileDialog dialog = new OpenFileDialog();
             dialog.Filter = "Изображения|*.jpg;*.jpeg;*.png;*.bmp";
+            dialog.Multiselect = true;
 
             if (dialog.ShowDialog() == true)
             {
-                photoPath = dialog.FileName;
-                imgPhoto.Source = new BitmapImage(new Uri(photoPath));
+                if (dialog.FileNames != null && dialog.FileNames.Length > 0)
+                {
+                    foreach (var file in dialog.FileNames)
+                    {
+                        if (!photoPaths.Contains(file))
+                        {
+                            photoPaths.Add(file);
+                        }
+                    }
+                    UpdatePhotoDisplay();
+                }
+            }
+        }
+
+        private void BtnRemovePhoto_Click(object sender, RoutedEventArgs e)
+        {
+            if (selectedThumbnailIndex >= 0 && selectedThumbnailIndex < photoPaths.Count)
+            {
+                photoPaths.RemoveAt(selectedThumbnailIndex);
+                if (photoPaths.Count > 0)
+                {
+                    selectedThumbnailIndex = Math.Min(selectedThumbnailIndex, photoPaths.Count - 1);
+                }
+                else
+                {
+                    selectedThumbnailIndex = -1;
+                }
+                UpdatePhotoDisplay();
             }
         }
 
         private void BtnClearPhoto_Click(object sender, RoutedEventArgs e)
         {
-            photoPath = "";
-            imgPhoto.Source = null;
+            photoPaths.Clear();
+            selectedThumbnailIndex = -1;
+            UpdatePhotoDisplay();
+        }
+
+        private void LstPhotoThumbnails_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (lstPhotoThumbnails.SelectedIndex >= 0)
+            {
+                ShowPhoto(lstPhotoThumbnails.SelectedIndex);
+            }
         }
 
         private async void BtnSave_Click(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrEmpty(txtInventoryNumber.Text))
+            string inventoryNumber = txtInventoryNumber.Text.Trim();
+            if (string.IsNullOrEmpty(inventoryNumber))
             {
-                MessageBox.Show("Введите инвентарный номер");
+                MessageBox.Show("Введите инвентарный номер", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtInventoryNumber.Focus();
                 return;
             }
 
-            if (string.IsNullOrEmpty(txtName.Text))
+            if (dbService.IsInventoryNumberExists(inventoryNumber, editId == -1 ? null : (int?)editId))
             {
-                MessageBox.Show("Введите название");
+                MessageBox.Show("Экспонат с таким инвентарным номером уже существует!", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtInventoryNumber.Focus();
                 return;
             }
 
-            string finalPhoto = "";
-            if (!string.IsNullOrEmpty(photoPath))
+            if (editId != -1)
             {
-                string folder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Photos");
-                if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
+                int currentVersion = dbService.GetExhibitVersion(editId);
+                if (currentVersion != originalDataVersion)
+                {
+                    MessageBox.Show("Данные были изменены другим пользователем. Пожалуйста, обновите страницу и попробуйте снова.", "Конфликт данных", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+            }
 
-                string fileName = $"{txtInventoryNumber.Text}_{DateTime.Now.Ticks}{Path.GetExtension(photoPath)}";
-                finalPhoto = Path.Combine(folder, fileName);
-                File.Copy(photoPath, finalPhoto, true);
+            string name = txtName.Text.Trim();
+            if (string.IsNullOrEmpty(name))
+            {
+                MessageBox.Show("Введите название экспоната", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtName.Focus();
+                return;
+            }
+
+            decimal cost = 0;
+            if (!string.IsNullOrEmpty(txtCost.Text) && !decimal.TryParse(txtCost.Text, out cost))
+            {
+                MessageBox.Show("Введите корректную стоимость (число)", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtCost.Focus();
+                return;
+            }
+
+            int year = 0;
+            if (!string.IsNullOrEmpty(txtYearOfOrigin.Text) && !int.TryParse(txtYearOfOrigin.Text, out year))
+            {
+                MessageBox.Show("Введите корректный год создания (число)", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtYearOfOrigin.Focus();
+                return;
+            }
+
+            if (year < 0 || year > DateTime.Now.Year)
+            {
+                MessageBox.Show($"Год создания должен быть от 0 до {DateTime.Now.Year}", "Ошибка валидации", MessageBoxButton.OK, MessageBoxImage.Warning);
+                txtYearOfOrigin.Focus();
+                return;
+            }
+
+            List<string> copiedPhotoPaths = new List<string>();
+            string photosFolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Photos");
+            if (!Directory.Exists(photosFolder)) Directory.CreateDirectory(photosFolder);
+
+            foreach (var originalPath in photoPaths)
+            {
+                if (!string.IsNullOrEmpty(originalPath) && File.Exists(originalPath))
+                {
+                    string normalizedPath = Path.GetFullPath(originalPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                    string normalizedPhotosFolder = Path.GetFullPath(photosFolder).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+                    bool isAlreadyInPhotosFolder = normalizedPath.StartsWith(normalizedPhotosFolder + Path.DirectorySeparatorChar) || 
+                                                  normalizedPath.StartsWith(normalizedPhotosFolder + Path.AltDirectorySeparatorChar);
+
+                    if (isAlreadyInPhotosFolder)
+                    {
+                        copiedPhotoPaths.Add(originalPath);
+                    }
+                    else
+                    {
+                        string fileName = $"{txtInventoryNumber.Text}_{DateTime.Now.Ticks}_{Guid.NewGuid()}{Path.GetExtension(originalPath)}";
+                        string destPath = Path.Combine(photosFolder, fileName);
+                        File.Copy(originalPath, destPath, true);
+                        copiedPhotoPaths.Add(destPath);
+                    }
+                }
             }
 
             Exhibit exhibit = new Exhibit();
             exhibit.Id = editId;
-            exhibit.InventoryNumber = txtInventoryNumber.Text;
-            exhibit.Name = txtName.Text;
-            exhibit.Category = txtCategory.Text;
-            exhibit.Material = txtMaterial.Text;
+            exhibit.InventoryNumber = inventoryNumber;
+            exhibit.Name = name;
+            exhibit.Category = txtCategory.Text.Trim();
+            exhibit.Material = txtMaterial.Text.Trim();
 
             ComboBoxItem conditionItem = cmbCondition.SelectedItem as ComboBoxItem;
             exhibit.Condition = conditionItem != null ? conditionItem.Content.ToString() : "В наличии";
 
             ComboBoxItem locationItem = cmbLocation.SelectedItem as ComboBoxItem;
-            exhibit.Location = locationItem != null ? locationItem.Content.ToString() : "Музей";
+            string location = locationItem != null ? locationItem.Content.ToString() : "Музей";
+            if (cmbLocation.IsEditable && !string.IsNullOrEmpty(cmbLocation.Text) && 
+                cmbLocation.Items.Cast<ComboBoxItem>().All(i => i.Content.ToString() != cmbLocation.Text))
+            {
+                location = cmbLocation.Text;
+            }
+            exhibit.Location = location;
 
-            exhibit.PhotoPath = finalPhoto;
+            exhibit.PhotoPaths = copiedPhotoPaths;
 
-            decimal cost = 0;
-            decimal.TryParse(txtCost.Text, out cost);
             exhibit.Cost = cost;
 
-            int year = 0;
-            if (int.TryParse(txtYearOfOrigin.Text, out year))
+            if (year > 0)
                 exhibit.YearOfOrigin = year;
 
             if (dpLastRestoration.SelectedDate.HasValue)

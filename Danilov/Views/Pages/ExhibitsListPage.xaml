@@ -72,7 +72,14 @@
                     <DataGridTextColumn Header="Год создания" Binding="{Binding YearOfOrigin}" Width="100"/>
                     <DataGridTextColumn Header="Ответственный" Binding="{Binding ResponsiblePerson}" Width="150"/>
                     <DataGridTextColumn Header="Источник" Binding="{Binding Source}" Width="120"/>
-                </DataGrid.Columns>
+                <DataGridTemplateColumn Header="Фото">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="📷" Click="BtnPhotos_Click" Tag="{Binding}" Width="40" Height="25" Background="#6C3483" Foreground="White" BorderThickness="0" ToolTip="Просмотр фотографий"/> 
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+</DataGrid.Columns>
             </DataGrid>
         </Border>
 
@@ -85,17 +92,81 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left">
-                    <Button x:Name="btnFirst" Content="◀◀" Background="#3D3D3D" Foreground="White" FontSize="13" FontWeight="Bold" Width="50" Height="30" Cursor="Hand" BorderThickness="1" BorderBrush="#555555" Margin="2" Click="BtnFirst_Click"/>
-                    <Button x:Name="btnPrev" Content="◀" Background="#3D3D3D" Foreground="White" FontSize="13" FontWeight="Bold" Width="50" Height="30" Cursor="Hand" BorderThickness="1" BorderBrush="#555555" Margin="2" Click="BtnPrev_Click"/>
-                    <TextBlock x:Name="txtPageInfo" VerticalAlignment="Center" Margin="10,0" Foreground="White"/>
-                    <Button x:Name="btnNext" Content="▶" Background="#3D3D3D" Foreground="White" FontSize="13" FontWeight="Bold" Width="50" Height="30" Cursor="Hand" BorderThickness="1" BorderBrush="#555555" Margin="2" Click="BtnNext_Click"/>
-                    <Button x:Name="btnLast" Content="▶▶" Background="#3D3D3D" Foreground="White" FontSize="13" FontWeight="Bold" Width="50" Height="30" Cursor="Hand" BorderThickness="1" BorderBrush="#555555" Margin="2" Click="BtnLast_Click"/>
+                    <Button x:Name="btnFirst" Content="⏮" Foreground="White" FontSize="14" FontWeight="Bold" Width="40" Height="30" Cursor="Hand" Margin="2" Click="BtnFirst_Click" ToolTip="Первая страница">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="#6C3483" CornerRadius="3">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#8B4593"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#5A2874"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="btnPrev" Content="◀" Foreground="White" FontSize="14" FontWeight="Bold" Width="40" Height="30" Cursor="Hand" Margin="2" Click="BtnPrev_Click" ToolTip="Предыдущая страница">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="#6C3483" CornerRadius="3">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#8B4593"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#5A2874"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <TextBlock x:Name="txtPageInfo" VerticalAlignment="Center" Margin="15,0" Foreground="White" FontSize="12"/>
+                    <Button x:Name="btnNext" Content="▶" Foreground="White" FontSize="14" FontWeight="Bold" Width="40" Height="30" Cursor="Hand" Margin="2" Click="BtnNext_Click" ToolTip="Следующая страница">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="#6C3483" CornerRadius="3">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#8B4593"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#5A2874"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="btnLast" Content="⏭" Foreground="White" FontSize="14" FontWeight="Bold" Width="40" Height="30" Cursor="Hand" Margin="2" Click="BtnLast_Click" ToolTip="Последняя страница">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="#6C3483" CornerRadius="3">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#8B4593"/>
+                                    </Trigger>
+                                    <Trigger Property="IsPressed" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#5A2874"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="btnAdd" Content="Добавить" Background="#27AE60" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="100" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnAdd_Click"/>
-                    <Button x:Name="btnEdit" Content="Редактировать" Background="#F47B20" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="110" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnEdit_Click"/>
-                    <Button x:Name="btnDelete" Content="Удалить" Background="#E74C3C" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="100" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnDelete_Click"/>
+                    <Button x:Name="btnAdd" Content="➕ Добавить" Background="#27AE60" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="120" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnAdd_Click" ToolTip="Добавить новый экспонат"/>
+                    <Button x:Name="btnEdit" Content="✏️ Редактировать" Background="#F47B20" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="140" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnEdit_Click" ToolTip="Редактировать выбранный экспонат"/>
+                    <Button x:Name="btnDelete" Content="🗑️ Удалить" Background="#E74C3C" Foreground="White" FontSize="13" FontWeight="SemiBold" Width="120" Height="35" Cursor="Hand" BorderThickness="0" Margin="5" Click="BtnDelete_Click" ToolTip="Удалить выбранный экспонат"/>
                 </StackPanel>
             </Grid>
         </Border>

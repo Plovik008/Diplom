@@ -11,7 +11,20 @@ namespace MuseumAccountingSystem.Views
         public LoginWindow()
         {
             InitializeComponent();
-            dbService = new DatabaseService();
+            try
+            {
+                dbService = new DatabaseService();
+            }
+            catch (Exception ex)
+            {
+                string errorDetails = ex.Message;
+                if (ex.InnerException != null)
+                    errorDetails += "\n\nВнутренняя ошибка: " + ex.InnerException.Message;
+
+                MessageBox.Show($"Ошибка подключения к базе данных:\n{errorDetails}\n\nПроверьте:\n1. PostgreSQL запущен\n2. Логин и пароль верны\n3. База данных museumdb существует",
+                    "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+                dbService = null;
+            }
         }
 
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
@@ -29,6 +42,13 @@ namespace MuseumAccountingSystem.Views
             if (string.IsNullOrEmpty(password))
             {
                 txtError.Text = "Введите пароль";
+                txtError.Visibility = Visibility.Visible;
+                return;
+            }
+
+            if (dbService == null)
+            {
+                txtError.Text = "Ошибка подключения к базе данных";
                 txtError.Visibility = Visibility.Visible;
                 return;
             }

@@ -30,99 +30,131 @@
                                Margin="10,0,0,0"/>
                 </StackPanel>
 
-                <StackPanel Orientation="Horizontal" 
-                            HorizontalAlignment="Center" 
-                            VerticalAlignment="Center">
+                <Border Background="#5A2D81" CornerRadius="5" Padding="8,0" Margin="0,8">
+                    <StackPanel Orientation="Horizontal" 
+                                HorizontalAlignment="Center" 
+                                VerticalAlignment="Center">
 
-                    <Button Content="Экспонаты" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuExhibits_Click"/>
+                        <Button Content="Экспонаты" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuExhibits_Click"/>
 
-                    <Button Content="Выдача" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuIssue_Click"/>
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
 
-                    <Button Content="Возврат" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuReturn_Click"/>
+                        <Button x:Name="btnIssue" Content="Выдача" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuIssue_Click"/>
 
-                    <Button Content="Журнал" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuJournal_Click"/>
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
 
-                    <Button Content="Преподаватели" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="120"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuTeachers_Click"/>
+                        <Button Content="Возврат" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuReturn_Click"/>
 
-                    <Button Content="Отчеты" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuStatistics_Click"/>
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
 
-                    <Button Content="Календарь" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="110"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Click="MenuCalendar_Click"/>
+                        <Button Content="Журнал" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuJournal_Click"/>
 
-                    <Button x:Name="btnLogs" Content="Журнал действий" 
-                            Background="Transparent" 
-                            Foreground="White"
-                            BorderThickness="0"
-                            Height="60"
-                            Width="130"
-                            Cursor="Hand"
-                            FontSize="14"
-                            FontWeight="SemiBold"
-                            Visibility="Collapsed"
-                            Click="MenuLogs_Click"/>
-                </StackPanel>
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
+
+                        <Button x:Name="btnTeachers" Content="Преподаватели" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuTeachers_Click"/>
+
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
+
+                        <Button x:Name="btnStatistics" Content="Отчеты" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuStatistics_Click"/>
+
+                        <Border Background="#4A2066" Width="1" Margin="5,8"/>
+
+                        <Button Content="Календарь" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Click="MenuCalendar_Click"/>
+
+                        <Border x:Name="logsSeparator" Background="#4A2066" Width="1" Margin="5,8" Visibility="Collapsed"/>
+
+                        <Button x:Name="btnLogs" Content="Журнал действий" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Width="130"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Visibility="Collapsed"
+                                Click="MenuLogs_Click"/>
+
+                        <Border x:Name="backupSeparator" Background="#4A2066" Width="1" Margin="5,8" Visibility="Collapsed"/>
+
+                        <Button x:Name="btnBackup" Content="Резервная копия" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="10,0"
+                                Width="145"
+                                Cursor="Hand"
+                                FontSize="12"
+                                FontWeight="SemiBold"
+                                Visibility="Collapsed"
+                                Click="MenuBackup_Click"/>
+                    </StackPanel>
+                </Border>
 
                 <StackPanel Orientation="Horizontal" 
                             HorizontalAlignment="Right" 
