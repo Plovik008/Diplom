@@ -62,7 +62,7 @@
                          Background="#3D3D3D"
                          Foreground="White"
                          BorderBrush="#555555"
-                         Text="admin"/>
+                         Text=""/>
 
                 <TextBlock Text="Пароль" FontSize="13" Foreground="#9E9E9E" Margin="0,15,0,5"/>
                 <TextBox x:Name="txtPassword" 
@@ -71,7 +71,7 @@
                          Background="#3D3D3D"
                          Foreground="White"
                          BorderBrush="#555555"
-                         Text="admin123"/>
+                         Text=""/>
 
                 <Button x:Name="btnLogin" 
                         Content="ВОЙТИ" 

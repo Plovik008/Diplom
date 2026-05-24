@@ -67,16 +67,6 @@ namespace MuseumAccountingSystem.Services
             {
                 conn.Open();
 
-                string clearOldTeachers = "DELETE FROM teachers WHERE fullname = 'Иванов Иван Иванович' OR email = 'ivanov@university.ru'";
-                try
-                {
-                    using (var cmdClear = new NpgsqlCommand(clearOldTeachers, conn))
-                    {
-                        cmdClear.ExecuteNonQuery();
-                    }
-                }
-                catch { }
-
                 string createTables = @"
                     CREATE TABLE IF NOT EXISTS users (
                         id SERIAL PRIMARY KEY,
@@ -187,24 +177,162 @@ namespace MuseumAccountingSystem.Services
                     cmd.ExecuteNonQuery();
                 }
 
-                string checkUsers = "SELECT COUNT(*) FROM users";
-                using (var cmd = new NpgsqlCommand(checkUsers, conn))
+                SeedDatabaseIfEmpty(conn);
+            }
+        }
+
+        private void SeedDatabaseIfEmpty(NpgsqlConnection conn)
+        {
+            using (var checkCmd = new NpgsqlCommand("SELECT COUNT(*) FROM users", conn))
+            {
+                if (Convert.ToInt64(checkCmd.ExecuteScalar()) > 0)
+                    return;
+            }
+
+            using (var transaction = conn.BeginTransaction())
+            {
+                var teacherIds = new Dictionary<string, int>();
+                teacherIds["Смирнова Ольга Викторовна"] = InsertTeacher(conn, transaction, "Смирнова Ольга Викторовна", "Кафедра истории", "smirnova.ov@museum.local", "+7 (343) 200-10-01");
+                teacherIds["Кузнецов Дмитрий Игоревич"] = InsertTeacher(conn, transaction, "Кузнецов Дмитрий Игоревич", "Кафедра археологии", "kuznetsov.di@museum.local", "+7 (343) 200-10-02");
+                teacherIds["Мельникова Анна Сергеевна"] = InsertTeacher(conn, transaction, "Мельникова Анна Сергеевна", "Кафедра искусствоведения", "melnikova.as@museum.local", "+7 (343) 200-10-03");
+                teacherIds["Фролов Алексей Петрович"] = InsertTeacher(conn, transaction, "Фролов Алексей Петрович", "Кафедра этнографии", "frolov.ap@museum.local", "+7 (343) 200-10-04");
+                teacherIds["Егорова Наталья Павловна"] = InsertTeacher(conn, transaction, "Егорова Наталья Павловна", "Кафедра культурологии", "egorova.np@museum.local", "+7 (343) 200-10-05");
+                teacherIds["Волков Роман Андреевич"] = InsertTeacher(conn, transaction, "Волков Роман Андреевич", "Кафедра реставрации", "volkov.ra@museum.local", "+7 (343) 200-10-06");
+
+                InsertUser(conn, transaction, "museum_admin", "AdminMuse2026", "Admin", "Главный администратор", null);
+                InsertUser(conn, transaction, "museum_employee", "EmpMuse2026", "Employee", "Марина Андреевна Белова", null);
+                InsertUser(conn, transaction, "museum_operator", "OperMuse2026", "Employee", "Кирилл Сергеевич Грачев", null);
+                InsertUser(conn, transaction, "teacher_smirnova", "TeachMuse01", "Teacher", "Смирнова Ольга Викторовна", teacherIds["Смирнова Ольга Викторовна"]);
+                InsertUser(conn, transaction, "teacher_kuznetsov", "TeachMuse02", "Teacher", "Кузнецов Дмитрий Игоревич", teacherIds["Кузнецов Дмитрий Игоревич"]);
+                InsertUser(conn, transaction, "teacher_melnikova", "TeachMuse03", "Teacher", "Мельникова Анна Сергеевна", teacherIds["Мельникова Анна Сергеевна"]);
+                InsertUser(conn, transaction, "teacher_frolov", "TeachMuse04", "Teacher", "Фролов Алексей Петрович", teacherIds["Фролов Алексей Петрович"]);
+                InsertUser(conn, transaction, "teacher_egorova", "TeachMuse05", "Teacher", "Егорова Наталья Павловна", teacherIds["Егорова Наталья Павловна"]);
+                InsertUser(conn, transaction, "teacher_volkov", "TeachMuse06", "Teacher", "Волков Роман Андреевич", teacherIds["Волков Роман Андреевич"]);
+
+                var exhibitIds = new Dictionary<string, int>();
+                exhibitIds["MU-001"] = InsertExhibit(conn, transaction, "MU-001", "Бронзовый подсвечник XIX века", "Металл", "Бронза", "Отличное", "Выставочный зал", 18500m, new DateTime(2024, 3, 14), "Марина Андреевна Белова", "Передача из частной коллекции", 1884);
+                exhibitIds["MU-002"] = InsertExhibit(conn, transaction, "MU-002", "Археологическая амфора", "Археология", "Керамика", "Хорошее", "Фондовая комната", 42500m, new DateTime(2023, 11, 21), "Кирилл Сергеевич Грачев", "Экспедиция кафедры археологии", 1720);
+                exhibitIds["MU-003"] = InsertExhibit(conn, transaction, "MU-003", "Студенческий мундир начала XX века", "Текстиль", "Шерсть", "Удовлетворительное", "Музей", 21800m, new DateTime(2025, 1, 9), "Марина Андреевна Белова", "Архив университета", 1911);
+                exhibitIds["MU-004"] = InsertExhibit(conn, transaction, "MU-004", "Старинный глобус", "Учебные пособия", "Дерево и бумага", "Хорошее", "Аудитория 101", 30200m, new DateTime(2022, 9, 3), "Кирилл Сергеевич Грачев", "Дар выпускников", 1898);
+                exhibitIds["MU-005"] = InsertExhibit(conn, transaction, "MU-005", "Коллекция минералов Урала", "Естественнонаучная коллекция", "Камень", "Отличное", "Аудитория 202", 67000m, new DateTime(2024, 6, 18), "Марина Андреевна Белова", "Учебный фонд", 1956);
+                exhibitIds["MU-006"] = InsertExhibit(conn, transaction, "MU-006", "Рукописный каталог экспонатов", "Документы", "Бумага", "Хорошее", "Кабинет директора", 15400m, new DateTime(2025, 2, 12), "Кирилл Сергеевич Грачев", "Внутренний архив", 1937);
+                exhibitIds["MU-007"] = InsertExhibit(conn, transaction, "MU-007", "Набор этнографических украшений", "Этнография", "Серебро", "Отличное", "Выставочный зал", 58300m, new DateTime(2023, 8, 27), "Марина Андреевна Белова", "Полевые исследования", 1870);
+                exhibitIds["MU-008"] = InsertExhibit(conn, transaction, "MU-008", "Настольный микроскоп", "Приборы", "Металл и стекло", "Хорошее", "Реставрационная мастерская", 27600m, new DateTime(2024, 12, 1), "Кирилл Сергеевич Грачев", "Склад кафедры биологии", 1926);
+                exhibitIds["MU-009"] = InsertExhibit(conn, transaction, "MU-009", "Фотография открытия музея", "Фотоматериалы", "Фотобумага", "Хорошее", "Музей", 9800m, new DateTime(2024, 4, 5), "Марина Андреевна Белова", "Архив музея", 1964);
+                exhibitIds["MU-010"] = InsertExhibit(conn, transaction, "MU-010", "Гравюра с видом старого кампуса", "Графика", "Бумага", "Отличное", "Выставочный зал", 34700m, new DateTime(2023, 5, 19), "Кирилл Сергеевич Грачев", "Коллекция ректората", 1903);
+                exhibitIds["MU-011"] = InsertExhibit(conn, transaction, "MU-011", "Макет учебного корпуса", "Макеты", "Дерево", "Хорошее", "Аудитория 303", 24900m, new DateTime(2024, 10, 22), "Марина Андреевна Белова", "Учебная мастерская", 1978);
+                exhibitIds["MU-012"] = InsertExhibit(conn, transaction, "MU-012", "Полевой дневник экспедиции", "Документы", "Бумага", "Удовлетворительное", "Фондовая комната", 13200m, new DateTime(2025, 3, 7), "Кирилл Сергеевич Грачев", "Экспедиционный архив", 1949);
+
+                InsertIssue(conn, transaction, exhibitIds["MU-001"], teacherIds["Смирнова Ольга Викторовна"], new DateTime(2026, 5, 10), new DateTime(2026, 5, 28), null, "Подготовка к открытой лекции", "Выдан");
+                InsertIssue(conn, transaction, exhibitIds["MU-004"], teacherIds["Кузнецов Дмитрий Игоревич"], new DateTime(2026, 5, 2), new DateTime(2026, 5, 12), null, "Практическое занятие по истории картографии", "Выдан");
+                InsertIssue(conn, transaction, exhibitIds["MU-007"], teacherIds["Фролов Алексей Петрович"], new DateTime(2026, 4, 14), new DateTime(2026, 4, 25), new DateTime(2026, 4, 24), "Тематическая выставка кафедры", "Возвращен");
+                InsertIssue(conn, transaction, exhibitIds["MU-010"], teacherIds["Егорова Наталья Павловна"], new DateTime(2026, 5, 6), new DateTime(2026, 5, 30), null, "Оформление экспозиции ко Дню университета", "Выдан");
+                InsertIssue(conn, transaction, exhibitIds["MU-012"], teacherIds["Волков Роман Андреевич"], new DateTime(2026, 4, 7), new DateTime(2026, 4, 21), new DateTime(2026, 4, 20), "Подготовка реставрационного отчета", "Возвращен");
+
+                InsertLog(conn, transaction, "museum_admin", "Admin", "Создание", "Система", "Первичная инициализация", "Выполнен автоматический seed базы данных");
+                InsertLog(conn, transaction, "museum_employee", "Employee", "Выдача", "Экспонат", "Бронзовый подсвечник XIX века", "Выдан для открытой лекции");
+                InsertLog(conn, transaction, "museum_operator", "Employee", "Добавление", "Экспонат", "Макет учебного корпуса", "Экспонат внесен в учетную систему");
+                InsertLog(conn, transaction, "teacher_egorova", "Teacher", "Просмотр", "Журнал", "Собственные выдачи", "Пользователь открыл журнал выдач");
+
+                using (var versionCmd = new NpgsqlCommand("UPDATE data_version SET version = 1 WHERE id = 1", conn, transaction))
                 {
-                    long count = (long)cmd.ExecuteScalar();
-                    if (count == 0)
-                    {
-string insertDefault = @"
-                            INSERT INTO users (username, password, role, fullname) VALUES 
-                            ('admin', 'admin123', 'Admin', 'Администратор системы'),
-                            ('employee', 'employee123', 'Employee', 'Сотрудник музея'),
-                            ('teacher', 'teacher123', 'Teacher', 'Преподаватель');
-                        ";
-                        using (var cmd2 = new NpgsqlCommand(insertDefault, conn))
-                        {
-                            cmd2.ExecuteNonQuery();
-                        }
-                    }
+                    versionCmd.ExecuteNonQuery();
                 }
+
+                transaction.Commit();
+            }
+        }
+
+        private int InsertTeacher(NpgsqlConnection conn, NpgsqlTransaction transaction, string fullName, string department, string email, string phone)
+        {
+            const string sql = @"INSERT INTO teachers (fullname, department, email, phone)
+                                 VALUES (@fullname, @department, @email, @phone)
+                                 RETURNING id";
+            using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@fullname", fullName);
+                cmd.Parameters.AddWithValue("@department", (object)department ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@email", (object)email ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@phone", (object)phone ?? DBNull.Value);
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        private void InsertUser(NpgsqlConnection conn, NpgsqlTransaction transaction, string username, string password, string role, string fullName, int? teacherId)
+        {
+            const string sql = @"INSERT INTO users (username, password, role, fullname, teacher_id)
+                                 VALUES (@username, @password, @role, @fullname, @teacher_id)";
+            using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@password", password);
+                cmd.Parameters.AddWithValue("@role", role);
+                cmd.Parameters.AddWithValue("@fullname", fullName);
+                cmd.Parameters.AddWithValue("@teacher_id", (object)teacherId ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private int InsertExhibit(NpgsqlConnection conn, NpgsqlTransaction transaction, string inventoryNumber, string name, string category, string material, string condition, string location, decimal cost, DateTime? lastRestorationDate, string responsiblePerson, string source, int? yearOfOrigin)
+        {
+            const string sql = @"INSERT INTO exhibits
+                                (inventory_number, name, category, material, condition, location, photo_paths, cost, last_restoration_date, responsible_person, source, year_of_origin, created_date, data_version)
+                                VALUES
+                                (@inventory_number, @name, @category, @material, @condition, @location, '[]', @cost, @last_restoration_date, @responsible_person, @source, @year_of_origin, @created_date, 0)
+                                RETURNING id";
+            using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@inventory_number", inventoryNumber);
+                cmd.Parameters.AddWithValue("@name", name);
+                cmd.Parameters.AddWithValue("@category", (object)category ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@material", (object)material ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@condition", (object)condition ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@location", (object)location ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@cost", cost);
+                cmd.Parameters.AddWithValue("@last_restoration_date", (object)lastRestorationDate ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@responsible_person", (object)responsiblePerson ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@source", (object)source ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@year_of_origin", (object)yearOfOrigin ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@created_date", DateTime.Now.AddDays(-30));
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        private void InsertIssue(NpgsqlConnection conn, NpgsqlTransaction transaction, int exhibitId, int teacherId, DateTime issueDate, DateTime plannedReturnDate, DateTime? actualReturnDate, string purpose, string status)
+        {
+            const string sql = @"INSERT INTO issues
+                                (exhibit_id, teacher_id, issue_date, planned_return_date, actual_return_date, purpose, status, data_version)
+                                VALUES
+                                (@exhibit_id, @teacher_id, @issue_date, @planned_return_date, @actual_return_date, @purpose, @status, 0)";
+            using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@exhibit_id", exhibitId);
+                cmd.Parameters.AddWithValue("@teacher_id", teacherId);
+                cmd.Parameters.AddWithValue("@issue_date", issueDate);
+                cmd.Parameters.AddWithValue("@planned_return_date", plannedReturnDate);
+                cmd.Parameters.AddWithValue("@actual_return_date", (object)actualReturnDate ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@purpose", (object)purpose ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@status", status);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        private void InsertLog(NpgsqlConnection conn, NpgsqlTransaction transaction, string username, string userRole, string action, string targetType, string targetName, string details)
+        {
+            const string sql = @"INSERT INTO user_logs
+                                (username, user_role, action, target_type, target_name, action_time, details)
+                                VALUES
+                                (@username, @user_role, @action, @target_type, @target_name, @action_time, @details)";
+            using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@user_role", userRole);
+                cmd.Parameters.AddWithValue("@action", action);
+                cmd.Parameters.AddWithValue("@target_type", targetType);
+                cmd.Parameters.AddWithValue("@target_name", (object)targetName ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@action_time", DateTime.Now.AddDays(-5));
+                cmd.Parameters.AddWithValue("@details", (object)details ?? DBNull.Value);
+                cmd.ExecuteNonQuery();
             }
         }
 
