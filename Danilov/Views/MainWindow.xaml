@@ -87,6 +87,20 @@
 
                         <Border Background="#4A2066" Width="1" Margin="5,8"/>
 
+                        <Button x:Name="btnUsers" Content="Пользователи" 
+                                Background="Transparent" 
+                                Foreground="White"
+                                BorderThickness="0"
+                                Height="44"
+                                Padding="15,0"
+                                Cursor="Hand"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                Visibility="Collapsed"
+                                Click="MenuUsers_Click"/>
+
+                        <Border x:Name="usersSeparator" Background="#4A2066" Width="1" Margin="5,8" Visibility="Collapsed"/>
+
                         <Button x:Name="btnTeachers" Content="Преподаватели" 
                                 Background="Transparent" 
                                 Foreground="White"
@@ -132,7 +146,7 @@
                                 BorderThickness="0"
                                 Height="44"
                                 Padding="15,0"
-                                Width="130"
+                                MinWidth="160"
                                 Cursor="Hand"
                                 FontSize="13"
                                 FontWeight="SemiBold"

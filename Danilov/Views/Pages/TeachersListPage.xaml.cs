@@ -22,7 +22,7 @@ namespace MuseumAccountingSystem.Views.Pages
             dbService.DataChanged += OnDataChanged;
             LoadTeachers();
 
-            if (!currentUser.IsAdmin)
+            if (!currentUser.IsAdmin && !currentUser.IsEmployee)
             {
                 btnAdd.Visibility = Visibility.Collapsed;
                 btnEdit.Visibility = Visibility.Collapsed;
@@ -116,5 +116,6 @@ namespace MuseumAccountingSystem.Views.Pages
                 MessageBox.Show("Преподаватель удален");
             }
         }
+
     }
 }

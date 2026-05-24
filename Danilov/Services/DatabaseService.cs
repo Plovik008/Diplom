@@ -19,13 +19,50 @@ namespace MuseumAccountingSystem.Services
 
         public DatabaseService()
         {
-            connectionString = ConfigurationManager.ConnectionStrings["MuseumDB"].ConnectionString;
+            connectionString = BuildConnectionString();
             InitializeDatabase();
             StartRefreshTimer();
         }
 
-private void InitializeDatabase()
+        private string BuildConnectionString()
         {
+            string configuredConnection = ConfigurationManager.ConnectionStrings["MuseumDB"]?.ConnectionString;
+            var builder = string.IsNullOrWhiteSpace(configuredConnection)
+                ? new NpgsqlConnectionStringBuilder()
+                : new NpgsqlConnectionStringBuilder(configuredConnection);
+
+            string envHost = Environment.GetEnvironmentVariable("MUSEUM_DB_HOST");
+            string envPort = Environment.GetEnvironmentVariable("MUSEUM_DB_PORT");
+            string envDatabase = Environment.GetEnvironmentVariable("MUSEUM_DB_NAME");
+            string envUsername = Environment.GetEnvironmentVariable("MUSEUM_DB_USER");
+            string envPassword = Environment.GetEnvironmentVariable("MUSEUM_DB_PASSWORD");
+
+            if (!string.IsNullOrWhiteSpace(envHost)) builder.Host = envHost;
+            if (int.TryParse(envPort, out int parsedPort)) builder.Port = parsedPort;
+            if (!string.IsNullOrWhiteSpace(envDatabase)) builder.Database = envDatabase;
+            if (!string.IsNullOrWhiteSpace(envUsername)) builder.Username = envUsername;
+            if (!string.IsNullOrWhiteSpace(envPassword)) builder.Password = envPassword;
+
+            if (string.IsNullOrWhiteSpace(builder.Host))
+                builder.Host = "localhost";
+            if (builder.Port == 0)
+                builder.Port = 5432;
+            if (string.IsNullOrWhiteSpace(builder.Database))
+                builder.Database = "museumdb";
+            if (string.IsNullOrWhiteSpace(builder.Username))
+                builder.Username = "postgres";
+            if (string.IsNullOrWhiteSpace(builder.Password))
+                builder.Password = "postgres";
+            if (builder.SslMode == SslMode.Prefer)
+                builder.SslMode = SslMode.Disable;
+
+            return builder.ConnectionString;
+        }
+
+        private void InitializeDatabase()
+        {
+            EnsureDatabaseExists();
+
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
@@ -108,9 +145,24 @@ private void InitializeDatabase()
                         id INTEGER PRIMARY KEY DEFAULT 1,
                         version INTEGER DEFAULT 0
                     );
+
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_users_teacher_id
+                    ON users(teacher_id)
+                    WHERE teacher_id IS NOT NULL;
                 ";
 
                 using (var cmd = new NpgsqlCommand(createTables, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
+                string updateLegacySchema = @"
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS teacher_id INTEGER;
+                    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS department VARCHAR(200);
+                    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS email VARCHAR(100);
+                    ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+                ";
+                using (var cmd = new NpgsqlCommand(updateLegacySchema, conn))
                 {
                     cmd.ExecuteNonQuery();
                 }
@@ -150,6 +202,34 @@ string insertDefault = @"
                         using (var cmd2 = new NpgsqlCommand(insertDefault, conn))
                         {
                             cmd2.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+        }
+
+        private void EnsureDatabaseExists()
+        {
+            var targetBuilder = new NpgsqlConnectionStringBuilder(connectionString);
+            var adminBuilder = new NpgsqlConnectionStringBuilder(connectionString)
+            {
+                Database = "postgres"
+            };
+
+            using (var conn = new NpgsqlConnection(adminBuilder.ConnectionString))
+            {
+                conn.Open();
+                string sql = "SELECT 1 FROM pg_database WHERE datname = @database";
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@database", targetBuilder.Database);
+                    bool exists = cmd.ExecuteScalar() != null;
+                    if (!exists)
+                    {
+                        string safeDatabaseName = targetBuilder.Database.Replace("\"", "\"\"");
+                        using (var createCmd = new NpgsqlCommand($"CREATE DATABASE \"{safeDatabaseName}\"", conn))
+                        {
+                            createCmd.ExecuteNonQuery();
                         }
                     }
                 }
@@ -412,7 +492,11 @@ string insertDefault = @"
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "SELECT id, fullname, department, email, phone FROM teachers ORDER BY fullname";
+                string sql = @"
+                    SELECT t.id, t.fullname, t.department, t.email, t.phone, u.username, u.password
+                    FROM teachers t
+                    LEFT JOIN users u ON u.teacher_id = t.id AND u.role = 'Teacher'
+                    ORDER BY t.fullname";
                 using (var cmd = new NpgsqlCommand(sql, conn))
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -424,7 +508,9 @@ string insertDefault = @"
                             FullName = reader.GetString(1),
                             Department = reader.IsDBNull(2) ? null : reader.GetString(2),
                             Email = reader.IsDBNull(3) ? null : reader.GetString(3),
-                            Phone = reader.IsDBNull(4) ? null : reader.GetString(4)
+                            Phone = reader.IsDBNull(4) ? null : reader.GetString(4),
+                            Username = reader.IsDBNull(5) ? null : reader.GetString(5),
+                            Password = reader.IsDBNull(6) ? null : reader.GetString(6)
                         });
                     }
                 }
@@ -455,6 +541,29 @@ string insertDefault = @"
             }
         }
 
+        public bool IsTeacherUsernameExists(string username, int? excludeTeacherId = null)
+        {
+            if (string.IsNullOrWhiteSpace(username))
+                return false;
+
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER(@username) AND role = 'Teacher'";
+                if (excludeTeacherId.HasValue)
+                    sql += " AND (teacher_id IS NULL OR teacher_id != @excludeId)";
+
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", username.Trim());
+                    if (excludeTeacherId.HasValue)
+                        cmd.Parameters.AddWithValue("@excludeId", excludeTeacherId.Value);
+
+                    return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+                }
+            }
+        }
+
         public void AddTeacher(Teacher teacher, User currentUser = null)
         {
             if (!string.IsNullOrEmpty(teacher.Email) && IsTeacherEmailExists(teacher.Email))
@@ -462,23 +571,46 @@ string insertDefault = @"
                 throw new Exception("Преподаватель с таким email уже существует");
             }
 
+            if (!string.IsNullOrWhiteSpace(teacher.Username) && string.IsNullOrWhiteSpace(teacher.Password))
+            {
+                throw new Exception("Введите пароль для логина преподавателя");
+            }
+
+            if (string.IsNullOrWhiteSpace(teacher.Username) && !string.IsNullOrWhiteSpace(teacher.Password))
+            {
+                throw new Exception("Введите логин преподавателя");
+            }
+
+            if (!string.IsNullOrWhiteSpace(teacher.Username) && IsTeacherUsernameExists(teacher.Username))
+            {
+                throw new Exception("Преподаватель с таким логином уже существует");
+            }
+
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "INSERT INTO teachers (fullname, department, email, phone) VALUES (@fullname, @department, @email, @phone)";
-                using (var cmd = new NpgsqlCommand(sql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@fullname", teacher.FullName);
-                    cmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
-                    cmd.ExecuteNonQuery();
+                    string sql = "INSERT INTO teachers (fullname, department, email, phone) VALUES (@fullname, @department, @email, @phone) RETURNING id";
+                    int teacherId;
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                        cmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
+                        teacherId = Convert.ToInt32(cmd.ExecuteScalar());
+                    }
+
+                    teacher.Id = teacherId;
+                    UpsertTeacherUser(conn, transaction, teacher);
+                    transaction.Commit();
                 }
             }
             IncrementVersion();
             if (currentUser != null)
             {
-                AddLog(currentUser, "Добавление", "Преподаватель", teacher.FullName, $"Кафедра: {teacher.Department}");
+                AddLog(currentUser, "Добавление", "Преподаватель", teacher.FullName, BuildTeacherLogDetails(teacher));
             }
         }
 
@@ -489,24 +621,45 @@ string insertDefault = @"
                 throw new Exception("Преподаватель с таким email уже существует");
             }
 
+            if (!string.IsNullOrWhiteSpace(teacher.Username) && string.IsNullOrWhiteSpace(teacher.Password))
+            {
+                throw new Exception("Введите пароль для логина преподавателя");
+            }
+
+            if (string.IsNullOrWhiteSpace(teacher.Username) && !string.IsNullOrWhiteSpace(teacher.Password))
+            {
+                throw new Exception("Введите логин преподавателя");
+            }
+
+            if (!string.IsNullOrWhiteSpace(teacher.Username) && IsTeacherUsernameExists(teacher.Username, teacher.Id))
+            {
+                throw new Exception("Преподаватель с таким логином уже существует");
+            }
+
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = "UPDATE teachers SET fullname = @fullname, department = @department, email = @email, phone = @phone WHERE id = @id";
-                using (var cmd = new NpgsqlCommand(sql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@id", teacher.Id);
-                    cmd.Parameters.AddWithValue("@fullname", teacher.FullName);
-                    cmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
-                    cmd.ExecuteNonQuery();
+                    string sql = "UPDATE teachers SET fullname = @fullname, department = @department, email = @email, phone = @phone WHERE id = @id";
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@id", teacher.Id);
+                        cmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                        cmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    UpsertTeacherUser(conn, transaction, teacher);
+                    transaction.Commit();
                 }
             }
             IncrementVersion();
             if (currentUser != null)
             {
-                AddLog(currentUser, "Редактирование", "Преподаватель", teacher.FullName, $"Кафедра: {teacher.Department}");
+                AddLog(currentUser, "Редактирование", "Преподаватель", teacher.FullName, BuildTeacherLogDetails(teacher));
             }
         }
 
@@ -520,14 +673,187 @@ string insertDefault = @"
                 {
                     AddLog(currentUser, "Удаление", "Преподаватель", teacher.FullName, "");
                 }
-                string sql = "DELETE FROM teachers WHERE id = @id";
-                using (var cmd = new NpgsqlCommand(sql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@id", id);
-                    cmd.ExecuteNonQuery();
+                    using (var userCmd = new NpgsqlCommand("DELETE FROM users WHERE teacher_id = @id", conn, transaction))
+                    {
+                        userCmd.Parameters.AddWithValue("@id", id);
+                        userCmd.ExecuteNonQuery();
+                    }
+
+                    using (var cmd = new NpgsqlCommand("DELETE FROM teachers WHERE id = @id", conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@id", id);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
                 }
             }
             IncrementVersion();
+        }
+
+        public void ImportTeachers(List<Teacher> teachers, User currentUser = null)
+        {
+            if (teachers == null || teachers.Count == 0)
+                return;
+
+            foreach (var teacher in teachers)
+            {
+                if (string.IsNullOrWhiteSpace(teacher.FullName))
+                    throw new Exception("В списке импорта найден преподаватель без ФИО");
+            }
+
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    foreach (var teacher in teachers)
+                    {
+                        int? existingTeacherId = null;
+
+                        if (!string.IsNullOrWhiteSpace(teacher.Email))
+                        {
+                            using (var findByEmail = new NpgsqlCommand("SELECT id FROM teachers WHERE LOWER(email) = LOWER(@email) LIMIT 1", conn, transaction))
+                            {
+                                findByEmail.Parameters.AddWithValue("@email", teacher.Email.Trim());
+                                var result = findByEmail.ExecuteScalar();
+                                if (result != null)
+                                    existingTeacherId = Convert.ToInt32(result);
+                            }
+                        }
+
+                        if (!existingTeacherId.HasValue)
+                        {
+                            using (var findByName = new NpgsqlCommand("SELECT id FROM teachers WHERE LOWER(fullname) = LOWER(@fullname) LIMIT 1", conn, transaction))
+                            {
+                                findByName.Parameters.AddWithValue("@fullname", teacher.FullName.Trim());
+                                var result = findByName.ExecuteScalar();
+                                if (result != null)
+                                    existingTeacherId = Convert.ToInt32(result);
+                            }
+                        }
+
+                        teacher.FullName = teacher.FullName?.Trim();
+                        teacher.Department = NormalizeValue(teacher.Department);
+                        teacher.Email = NormalizeValue(teacher.Email);
+                        teacher.Phone = NormalizeValue(teacher.Phone);
+                        teacher.Username = NormalizeValue(teacher.Username);
+                        teacher.Password = NormalizeValue(teacher.Password);
+
+                        if (existingTeacherId.HasValue)
+                        {
+                            teacher.Id = existingTeacherId.Value;
+                            using (var updateCmd = new NpgsqlCommand("UPDATE teachers SET fullname = @fullname, department = @department, email = @email, phone = @phone WHERE id = @id", conn, transaction))
+                            {
+                                updateCmd.Parameters.AddWithValue("@id", teacher.Id);
+                                updateCmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                                updateCmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
+                                updateCmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
+                                updateCmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
+                                updateCmd.ExecuteNonQuery();
+                            }
+                        }
+                        else
+                        {
+                            using (var insertCmd = new NpgsqlCommand("INSERT INTO teachers (fullname, department, email, phone) VALUES (@fullname, @department, @email, @phone) RETURNING id", conn, transaction))
+                            {
+                                insertCmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                                insertCmd.Parameters.AddWithValue("@department", (object)teacher.Department ?? DBNull.Value);
+                                insertCmd.Parameters.AddWithValue("@email", (object)teacher.Email ?? DBNull.Value);
+                                insertCmd.Parameters.AddWithValue("@phone", (object)teacher.Phone ?? DBNull.Value);
+                                teacher.Id = Convert.ToInt32(insertCmd.ExecuteScalar());
+                            }
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(teacher.Username) && string.IsNullOrWhiteSpace(teacher.Password))
+                            throw new Exception($"Для преподавателя \"{teacher.FullName}\" не указан пароль");
+
+                        if (string.IsNullOrWhiteSpace(teacher.Username) && !string.IsNullOrWhiteSpace(teacher.Password))
+                            throw new Exception($"Для преподавателя \"{teacher.FullName}\" не указан логин");
+
+                        if (!string.IsNullOrWhiteSpace(teacher.Username) && IsTeacherUsernameExists(teacher.Username, teacher.Id))
+                            throw new Exception($"Логин \"{teacher.Username}\" уже используется");
+
+                        UpsertTeacherUser(conn, transaction, teacher);
+                    }
+
+                    transaction.Commit();
+                }
+            }
+
+            IncrementVersion();
+            if (currentUser != null)
+            {
+                AddLog(currentUser, "Импорт", "Преподаватели", $"Количество: {teachers.Count}", "Импорт преподавателей с логинами");
+            }
+        }
+
+        private void UpsertTeacherUser(NpgsqlConnection conn, NpgsqlTransaction transaction, Teacher teacher)
+        {
+            if (string.IsNullOrWhiteSpace(teacher.Username))
+            {
+                using (var deleteCmd = new NpgsqlCommand("DELETE FROM users WHERE teacher_id = @teacherId AND role = 'Teacher'", conn, transaction))
+                {
+                    deleteCmd.Parameters.AddWithValue("@teacherId", teacher.Id);
+                    deleteCmd.ExecuteNonQuery();
+                }
+                return;
+            }
+
+            string existingSql = "SELECT id FROM users WHERE teacher_id = @teacherId AND role = 'Teacher' LIMIT 1";
+            using (var checkCmd = new NpgsqlCommand(existingSql, conn, transaction))
+            {
+                checkCmd.Parameters.AddWithValue("@teacherId", teacher.Id);
+                var existingId = checkCmd.ExecuteScalar();
+                if (existingId == null)
+                {
+                    string insertSql = @"INSERT INTO users (username, password, role, fullname, teacher_id)
+                                         VALUES (@username, @password, 'Teacher', @fullname, @teacher_id)";
+                    using (var insertCmd = new NpgsqlCommand(insertSql, conn, transaction))
+                    {
+                        insertCmd.Parameters.AddWithValue("@username", teacher.Username.Trim());
+                        insertCmd.Parameters.AddWithValue("@password", teacher.Password.Trim());
+                        insertCmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                        insertCmd.Parameters.AddWithValue("@teacher_id", teacher.Id);
+                        insertCmd.ExecuteNonQuery();
+                    }
+                }
+                else
+                {
+                    string updateSql = @"UPDATE users
+                                         SET username = @username, password = @password, fullname = @fullname
+                                         WHERE id = @id";
+                    using (var updateCmd = new NpgsqlCommand(updateSql, conn, transaction))
+                    {
+                        updateCmd.Parameters.AddWithValue("@id", Convert.ToInt32(existingId));
+                        updateCmd.Parameters.AddWithValue("@username", teacher.Username.Trim());
+                        updateCmd.Parameters.AddWithValue("@password", teacher.Password.Trim());
+                        updateCmd.Parameters.AddWithValue("@fullname", teacher.FullName);
+                        updateCmd.ExecuteNonQuery();
+                    }
+                }
+            }
+        }
+
+        private string BuildTeacherLogDetails(Teacher teacher)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(teacher.Department))
+                parts.Add($"Кафедра: {teacher.Department}");
+            if (!string.IsNullOrWhiteSpace(teacher.Username))
+                parts.Add($"Логин: {teacher.Username}");
+
+            return parts.Count == 0 ? null : string.Join("; ", parts);
+        }
+
+        private string NormalizeValue(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            return value.Trim();
         }
 
         public Teacher GetTeacherByUser(User user)
@@ -704,6 +1030,255 @@ string insertDefault = @"
                 }
             }
             return null;
+        }
+
+        public List<User> GetTeacherUsers()
+        {
+            var users = new List<User>();
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"SELECT id, username, password, role, fullname, teacher_id
+                               FROM users
+                               WHERE role = 'Teacher'
+                               ORDER BY fullname, username";
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                using (var reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        users.Add(new User
+                        {
+                            Id = reader.GetInt32(0),
+                            Username = reader.GetString(1),
+                            Password = reader.GetString(2),
+                            Role = reader.GetString(3),
+                            FullName = reader.GetString(4),
+                            TeacherId = reader.IsDBNull(5) ? null : (int?)reader.GetInt32(5)
+                        });
+                    }
+                }
+            }
+
+            return users;
+        }
+
+        public User GetTeacherUserById(int userId)
+        {
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = @"SELECT id, username, password, role, fullname, teacher_id
+                               FROM users
+                               WHERE id = @id AND role = 'Teacher'";
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            return new User
+                            {
+                                Id = reader.GetInt32(0),
+                                Username = reader.GetString(1),
+                                Password = reader.GetString(2),
+                                Role = reader.GetString(3),
+                                FullName = reader.GetString(4),
+                                TeacherId = reader.IsDBNull(5) ? null : (int?)reader.GetInt32(5)
+                            };
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        public void AddTeacherUser(User user, User currentUser = null)
+        {
+            ValidateTeacherUser(user);
+
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    int teacherId = EnsureTeacherRecord(conn, transaction, null, user.FullName);
+
+                    string sql = @"INSERT INTO users (username, password, role, fullname, teacher_id)
+                                   VALUES (@username, @password, 'Teacher', @fullname, @teacher_id)";
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@username", user.Username.Trim());
+                        cmd.Parameters.AddWithValue("@password", user.Password.Trim());
+                        cmd.Parameters.AddWithValue("@fullname", user.FullName.Trim());
+                        cmd.Parameters.AddWithValue("@teacher_id", teacherId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+            }
+
+            IncrementVersion();
+            if (currentUser != null)
+            {
+                AddLog(currentUser, "Добавление", "Пользователь", user.FullName, $"Логин: {user.Username}");
+            }
+        }
+
+        public void UpdateTeacherUser(User user, User currentUser = null)
+        {
+            ValidateTeacherUser(user, user.Id);
+
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                using (var transaction = conn.BeginTransaction())
+                {
+                    int teacherId = EnsureTeacherRecord(conn, transaction, user.Id, user.FullName);
+
+                    string sql = @"UPDATE users
+                                   SET username = @username,
+                                       password = @password,
+                                       fullname = @fullname,
+                                       teacher_id = @teacher_id
+                                   WHERE id = @id AND role = 'Teacher'";
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@id", user.Id);
+                        cmd.Parameters.AddWithValue("@username", user.Username.Trim());
+                        cmd.Parameters.AddWithValue("@password", user.Password.Trim());
+                        cmd.Parameters.AddWithValue("@fullname", user.FullName.Trim());
+                        cmd.Parameters.AddWithValue("@teacher_id", teacherId);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
+                }
+            }
+
+            IncrementVersion();
+            if (currentUser != null)
+            {
+                AddLog(currentUser, "Редактирование", "Пользователь", user.FullName, $"Логин: {user.Username}");
+            }
+        }
+
+        public void DeleteTeacherUser(int userId, User currentUser = null)
+        {
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                string getSql = "SELECT fullname, username FROM users WHERE id = @id AND role = 'Teacher'";
+                string fullName = null;
+                string username = null;
+                using (var getCmd = new NpgsqlCommand(getSql, conn))
+                {
+                    getCmd.Parameters.AddWithValue("@id", userId);
+                    using (var reader = getCmd.ExecuteReader())
+                    {
+                        if (reader.Read())
+                        {
+                            fullName = reader.GetString(0);
+                            username = reader.GetString(1);
+                        }
+                    }
+                }
+
+                using (var cmd = new NpgsqlCommand("DELETE FROM users WHERE id = @id AND role = 'Teacher'", conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", userId);
+                    cmd.ExecuteNonQuery();
+                }
+
+                if (currentUser != null && !string.IsNullOrWhiteSpace(fullName))
+                {
+                    AddLog(currentUser, "Удаление", "Пользователь", fullName, $"Логин: {username}");
+                }
+            }
+
+            IncrementVersion();
+        }
+
+        private void ValidateTeacherUser(User user, int? excludeUserId = null)
+        {
+            if (user == null)
+                throw new Exception("Пользователь не передан");
+
+            if (string.IsNullOrWhiteSpace(user.FullName))
+                throw new Exception("Введите ФИО пользователя");
+
+            if (string.IsNullOrWhiteSpace(user.Username))
+                throw new Exception("Введите логин пользователя");
+
+            if (string.IsNullOrWhiteSpace(user.Password))
+                throw new Exception("Введите пароль пользователя");
+
+            using (var conn = new NpgsqlConnection(connectionString))
+            {
+                conn.Open();
+                string sql = "SELECT COUNT(*) FROM users WHERE LOWER(username) = LOWER(@username)";
+                if (excludeUserId.HasValue)
+                    sql += " AND id != @excludeId";
+
+                using (var cmd = new NpgsqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@username", user.Username.Trim());
+                    if (excludeUserId.HasValue)
+                        cmd.Parameters.AddWithValue("@excludeId", excludeUserId.Value);
+
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) > 0)
+                        throw new Exception("Пользователь с таким логином уже существует");
+                }
+            }
+        }
+
+        private int EnsureTeacherRecord(NpgsqlConnection conn, NpgsqlTransaction transaction, int? userId, string fullName)
+        {
+            string normalizedName = fullName.Trim();
+            int? teacherId = null;
+
+            if (userId.HasValue)
+            {
+                using (var getTeacherCmd = new NpgsqlCommand("SELECT teacher_id FROM users WHERE id = @id", conn, transaction))
+                {
+                    getTeacherCmd.Parameters.AddWithValue("@id", userId.Value);
+                    var existingTeacherId = getTeacherCmd.ExecuteScalar();
+                    if (existingTeacherId != null && existingTeacherId != DBNull.Value)
+                        teacherId = Convert.ToInt32(existingTeacherId);
+                }
+            }
+
+            if (!teacherId.HasValue)
+            {
+                using (var findTeacherCmd = new NpgsqlCommand("SELECT id FROM teachers WHERE LOWER(fullname) = LOWER(@fullname) ORDER BY id LIMIT 1", conn, transaction))
+                {
+                    findTeacherCmd.Parameters.AddWithValue("@fullname", normalizedName);
+                    var existingTeacherId = findTeacherCmd.ExecuteScalar();
+                    if (existingTeacherId != null)
+                        teacherId = Convert.ToInt32(existingTeacherId);
+                }
+            }
+
+            if (teacherId.HasValue)
+            {
+                using (var updateTeacherCmd = new NpgsqlCommand("UPDATE teachers SET fullname = @fullname WHERE id = @id", conn, transaction))
+                {
+                    updateTeacherCmd.Parameters.AddWithValue("@fullname", normalizedName);
+                    updateTeacherCmd.Parameters.AddWithValue("@id", teacherId.Value);
+                    updateTeacherCmd.ExecuteNonQuery();
+                }
+
+                return teacherId.Value;
+            }
+
+            using (var insertTeacherCmd = new NpgsqlCommand("INSERT INTO teachers (fullname) VALUES (@fullname) RETURNING id", conn, transaction))
+            {
+                insertTeacherCmd.Parameters.AddWithValue("@fullname", normalizedName);
+                return Convert.ToInt32(insertTeacherCmd.ExecuteScalar());
+            }
         }
 
         public List<UserActionLog> GetAllLogs()

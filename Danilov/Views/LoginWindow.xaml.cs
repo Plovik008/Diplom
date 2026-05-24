@@ -21,7 +21,7 @@ namespace MuseumAccountingSystem.Views
                 if (ex.InnerException != null)
                     errorDetails += "\n\nВнутренняя ошибка: " + ex.InnerException.Message;
 
-                MessageBox.Show($"Ошибка подключения к базе данных:\n{errorDetails}\n\nПроверьте:\n1. PostgreSQL запущен\n2. Логин и пароль верны\n3. База данных museumdb существует",
+                MessageBox.Show($"Ошибка подключения к базе данных:\n{errorDetails}\n\nПроверьте:\n1. PostgreSQL доступен на нужном компьютере или сервере\n2. Параметры подключения верны\n3. У пользователя есть право создать базу museumdb при первом запуске",
                     "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
                 dbService = null;
             }

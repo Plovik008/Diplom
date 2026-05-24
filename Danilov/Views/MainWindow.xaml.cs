@@ -33,12 +33,16 @@ namespace MuseumAccountingSystem.Views
             if (user.IsTeacher)
             {
                 btnIssue.Visibility = Visibility.Collapsed;
+                btnUsers.Visibility = Visibility.Collapsed;
+                usersSeparator.Visibility = Visibility.Collapsed;
                 btnTeachers.Visibility = Visibility.Collapsed;
                 btnStatistics.Visibility = Visibility.Collapsed;
             }
 
             if (user.IsAdmin)
             {
+                usersSeparator.Visibility = Visibility.Visible;
+                btnUsers.Visibility = Visibility.Visible;
                 logsSeparator.Visibility = Visibility.Visible;
                 btnLogs.Visibility = Visibility.Visible;
                 backupSeparator.Visibility = Visibility.Visible;
@@ -46,6 +50,8 @@ namespace MuseumAccountingSystem.Views
             }
             else if (user.IsEmployee)
             {
+                usersSeparator.Visibility = Visibility.Visible;
+                btnUsers.Visibility = Visibility.Visible;
                 logsSeparator.Visibility = Visibility.Visible;
                 btnLogs.Visibility = Visibility.Visible;
             }
@@ -109,6 +115,10 @@ namespace MuseumAccountingSystem.Views
             else if (currentPage is TeachersListPage)
             {
                 MainFrame.Navigate(new TeachersListPage(dbService, currentUser));
+            }
+            else if (currentPage is UsersListPage)
+            {
+                MainFrame.Navigate(new UsersListPage(dbService, currentUser));
             }
             else if (currentPage is IssuesJournalPage)
             {
@@ -217,6 +227,12 @@ namespace MuseumAccountingSystem.Views
         {
             MainFrame.Navigate(new TeachersListPage(dbService, currentUser));
             txtStatus.Text = "Управление списком преподавателей";
+        }
+
+        private void MenuUsers_Click(object sender, RoutedEventArgs e)
+        {
+            MainFrame.Navigate(new UsersListPage(dbService, currentUser));
+            txtStatus.Text = "Управление пользователями-преподавателями";
         }
 
         private void MenuStatistics_Click(object sender, RoutedEventArgs e)

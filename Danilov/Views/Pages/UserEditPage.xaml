@@ -1,0 +1,38 @@
+<Page x:Class="MuseumAccountingSystem.Views.Pages.UserEditPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      Title="Пользователь"
+      Background="#1E1E1E">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="lblTitle" FontSize="24" FontWeight="Bold" Foreground="#F47B20" Margin="0,0,0,20"/>
+
+        <Border Grid.Row="1" Background="#2D2D2D" Padding="30" Width="550" HorizontalAlignment="Center" CornerRadius="5">
+            <StackPanel>
+                <TextBlock Text="ФИО" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,5"/>
+                <TextBox x:Name="txtFullName" Height="40" Margin="0,0,0,20" Background="#3D3D3D" Foreground="White" BorderBrush="#555555" BorderThickness="1"/>
+
+                <TextBlock Text="Логин" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,5"/>
+                <TextBox x:Name="txtUsername" Height="40" Margin="0,0,0,20" Background="#3D3D3D" Foreground="White" BorderBrush="#555555" BorderThickness="1"/>
+
+                <TextBlock Text="Пароль" FontSize="14" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,5"/>
+                <TextBox x:Name="txtPassword" Height="40" Margin="0,0,0,10" Background="#3D3D3D" Foreground="White" BorderBrush="#555555" BorderThickness="1"/>
+
+                <TextBlock Text="Все созданные через эту форму пользователи получают роль преподавателя." FontSize="12" Foreground="#BBBBBB" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Background="#2D2D2D" Padding="20" Width="550" HorizontalAlignment="Center" Margin="0,20,0,0" CornerRadius="5">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button Content="Сохранить" Background="#27AE60" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Cursor="Hand" BorderThickness="0" Click="BtnSave_Click"/>
+                <Button Content="Отмена" Background="#E74C3C" Foreground="White" FontSize="14" FontWeight="Bold" Width="150" Height="40" Margin="20,0,0,0" Cursor="Hand" BorderThickness="0" Click="BtnCancel_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Page>
