@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
 using MuseumAccountingSystem.Services;
 
 namespace MuseumAccountingSystem.Views
@@ -11,6 +13,7 @@ namespace MuseumAccountingSystem.Views
         public LoginWindow()
         {
             InitializeComponent();
+
             try
             {
                 dbService = new DatabaseService();
@@ -18,11 +21,16 @@ namespace MuseumAccountingSystem.Views
             catch (Exception ex)
             {
                 string errorDetails = ex.Message;
+
                 if (ex.InnerException != null)
                     errorDetails += "\n\nВнутренняя ошибка: " + ex.InnerException.Message;
 
-                MessageBox.Show($"Ошибка подключения к базе данных:\n{errorDetails}\n\nПроверьте:\n1. PostgreSQL доступен на нужном компьютере или сервере\n2. Параметры подключения верны\n3. У пользователя есть право создать базу museumdb при первом запуске",
-                    "Ошибка подключения", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(
+                    $"Ошибка подключения к базе данных:\n{errorDetails}",
+                    "Ошибка подключения",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+
                 dbService = null;
             }
         }
@@ -30,32 +38,32 @@ namespace MuseumAccountingSystem.Views
         private void BtnLogin_Click(object sender, RoutedEventArgs e)
         {
             string username = txtUsername.Text.Trim();
-            string password = txtPassword.Text.Trim();
+            string password = txtPassword.Password.Trim();
 
-            if (string.IsNullOrEmpty(username))
+            ResetBorders();
+
+            if (string.IsNullOrWhiteSpace(username))
             {
-                txtError.Text = "Введите логин";
-                txtError.Visibility = Visibility.Visible;
+                ShowError("Введите логин");
+                txtUsername.BorderBrush = Brushes.Red;
                 return;
             }
 
-            if (string.IsNullOrEmpty(password))
+            if (string.IsNullOrWhiteSpace(password))
             {
-                txtError.Text = "Введите пароль";
-                txtError.Visibility = Visibility.Visible;
+                ShowError("Введите пароль");
+                txtPassword.BorderBrush = Brushes.Red;
                 return;
             }
 
             if (dbService == null)
             {
-                txtError.Text = "Ошибка подключения к базе данных";
-                txtError.Visibility = Visibility.Visible;
+                ShowError("Ошибка подключения к базе данных");
                 return;
             }
 
             btnLogin.IsEnabled = false;
             btnLogin.Content = "Проверка...";
-            txtError.Visibility = Visibility.Collapsed;
 
             try
             {
@@ -65,23 +73,46 @@ namespace MuseumAccountingSystem.Views
                 {
                     MainWindow mainWindow = new MainWindow(user);
                     mainWindow.Show();
-                    this.Hide();
+                    Hide();
+                    return;
                 }
-                else
-                {
-                    txtError.Text = "Неверный логин или пароль";
-                    txtError.Visibility = Visibility.Visible;
-                    btnLogin.IsEnabled = true;
-                    btnLogin.Content = "ВОЙТИ";
-                }
+
+                txtUsername.BorderBrush = Brushes.Red;
+                txtPassword.BorderBrush = Brushes.Red;
+
+                ShowError("Неверный логин или пароль");
             }
             catch (Exception ex)
             {
-                txtError.Text = "Ошибка: " + ex.Message;
-                txtError.Visibility = Visibility.Visible;
-                btnLogin.IsEnabled = true;
-                btnLogin.Content = "ВОЙТИ";
+                ShowError(ex.Message);
             }
+
+            btnLogin.IsEnabled = true;
+            btnLogin.Content = "ВОЙТИ";
+        }
+
+        private void TxtUsername_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            txtError.Visibility = Visibility.Collapsed;
+            ResetBorders();
+        }
+
+        private void TxtPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            txtError.Visibility = Visibility.Collapsed;
+            ResetBorders();
+        }
+
+        private void ShowError(string message)
+        {
+            txtError.Text = message;
+            txtError.Visibility = Visibility.Visible;
+        }
+
+        private void ResetBorders()
+        {
+            txtUsername.BorderBrush = new SolidColorBrush(Color.FromRgb(85, 85, 85));
+            txtPassword.BorderBrush = new SolidColorBrush(Color.FromRgb(85, 85, 85));
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)

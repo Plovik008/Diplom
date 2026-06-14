@@ -92,7 +92,7 @@ namespace MuseumAccountingSystem.Services
                         category VARCHAR(100),
                         material VARCHAR(100),
                         condition VARCHAR(50),
-                        location VARCHAR(100),
+                        location_id INTEGER,
                         photo_paths TEXT,
                         created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         cost DECIMAL(15,2),
@@ -116,15 +116,17 @@ namespace MuseumAccountingSystem.Services
                     );
 
                     CREATE TABLE IF NOT EXISTS user_logs (
-                        id SERIAL PRIMARY KEY,
-                        username VARCHAR(100) NOT NULL,
-                        user_role VARCHAR(50) NOT NULL,
-                        action VARCHAR(100) NOT NULL,
-                        target_type VARCHAR(100) NOT NULL,
-                        target_name VARCHAR(200),
-                        action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        details TEXT
-                    );
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER,
+    username VARCHAR(100) NOT NULL,
+    user_role VARCHAR(50) NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    target_type VARCHAR(100) NOT NULL,
+    target_id INTEGER,
+    target_name VARCHAR(200),
+    action_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    details TEXT
+);
 
                     CREATE TABLE IF NOT EXISTS locations (
                         id SERIAL PRIMARY KEY,
@@ -146,15 +148,126 @@ namespace MuseumAccountingSystem.Services
                     cmd.ExecuteNonQuery();
                 }
 
+                string createRelations = @"
+DO $$
+BEGIN
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_users_teacher'
+    ) THEN
+        ALTER TABLE users
+        ADD CONSTRAINT fk_users_teacher
+        FOREIGN KEY (teacher_id)
+        REFERENCES teachers(id)
+        ON DELETE SET NULL;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_issues_teacher'
+    ) THEN
+        ALTER TABLE issues
+        ADD CONSTRAINT fk_issues_teacher
+        FOREIGN KEY (teacher_id)
+        REFERENCES teachers(id)
+        ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_issues_exhibit'
+    ) THEN
+        ALTER TABLE issues
+        ADD CONSTRAINT fk_issues_exhibit
+        FOREIGN KEY (exhibit_id)
+        REFERENCES exhibits(id)
+        ON DELETE CASCADE;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM information_schema.table_constraints
+        WHERE constraint_name = 'fk_logs_user'
+    ) THEN
+        ALTER TABLE user_logs
+        ADD CONSTRAINT fk_logs_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE SET NULL;
+    END IF;
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM information_schema.table_constraints
+    WHERE constraint_name = 'fk_exhibits_location'
+) THEN
+    ALTER TABLE exhibits
+    ADD CONSTRAINT fk_exhibits_location
+    FOREIGN KEY (location_id)
+    REFERENCES locations(id)
+    ON DELETE SET NULL;
+END IF;
+
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_users_teacher_id
+ON users(teacher_id);
+
+CREATE INDEX IF NOT EXISTS idx_issues_teacher_id
+ON issues(teacher_id);
+
+CREATE INDEX IF NOT EXISTS idx_issues_exhibit_id
+ON issues(exhibit_id);
+
+CREATE INDEX IF NOT EXISTS idx_exhibits_location_id
+ON exhibits(location_id);
+
+CREATE INDEX IF NOT EXISTS idx_logs_user_id
+ON user_logs(user_id);
+";
+
+                using (var cmd = new NpgsqlCommand(createRelations, conn))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+
                 string updateLegacySchema = @"
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS teacher_id INTEGER;
                     ALTER TABLE teachers ADD COLUMN IF NOT EXISTS department VARCHAR(200);
                     ALTER TABLE teachers ADD COLUMN IF NOT EXISTS email VARCHAR(100);
                     ALTER TABLE teachers ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+                    ALTER TABLE exhibits ADD COLUMN IF NOT EXISTS location_id INTEGER;
                 ";
                 using (var cmd = new NpgsqlCommand(updateLegacySchema, conn))
                 {
                     cmd.ExecuteNonQuery();
+                }
+
+                if (TableColumnExists(conn, "exhibits", "location"))
+                {
+                    string migrateLegacyLocations = @"
+                        INSERT INTO locations (name)
+                        SELECT DISTINCT BTRIM(e.location)
+                        FROM exhibits e
+                        WHERE e.location IS NOT NULL
+                          AND BTRIM(e.location) <> ''
+                        ON CONFLICT (name) DO NOTHING;
+
+                        UPDATE exhibits e
+                        SET location_id = l.id
+                        FROM locations l
+                        WHERE e.location_id IS NULL
+                          AND e.location IS NOT NULL
+                          AND l.name = e.location;
+                    ";
+                    using (var cmd = new NpgsqlCommand(migrateLegacyLocations, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
                 }
 
                 string initLocations = @"
@@ -199,15 +312,15 @@ namespace MuseumAccountingSystem.Services
                 teacherIds["Егорова Наталья Павловна"] = InsertTeacher(conn, transaction, "Егорова Наталья Павловна", "Кафедра культурологии", "egorova.np@museum.local", "+7 (343) 200-10-05");
                 teacherIds["Волков Роман Андреевич"] = InsertTeacher(conn, transaction, "Волков Роман Андреевич", "Кафедра реставрации", "volkov.ra@museum.local", "+7 (343) 200-10-06");
 
-                InsertUser(conn, transaction, "museum_admin", "AdminMuse2026", "Admin", "Главный администратор", null);
-                InsertUser(conn, transaction, "museum_employee", "EmpMuse2026", "Employee", "Марина Андреевна Белова", null);
-                InsertUser(conn, transaction, "museum_operator", "OperMuse2026", "Employee", "Кирилл Сергеевич Грачев", null);
-                InsertUser(conn, transaction, "teacher_smirnova", "TeachMuse01", "Teacher", "Смирнова Ольга Викторовна", teacherIds["Смирнова Ольга Викторовна"]);
-                InsertUser(conn, transaction, "teacher_kuznetsov", "TeachMuse02", "Teacher", "Кузнецов Дмитрий Игоревич", teacherIds["Кузнецов Дмитрий Игоревич"]);
-                InsertUser(conn, transaction, "teacher_melnikova", "TeachMuse03", "Teacher", "Мельникова Анна Сергеевна", teacherIds["Мельникова Анна Сергеевна"]);
-                InsertUser(conn, transaction, "teacher_frolov", "TeachMuse04", "Teacher", "Фролов Алексей Петрович", teacherIds["Фролов Алексей Петрович"]);
-                InsertUser(conn, transaction, "teacher_egorova", "TeachMuse05", "Teacher", "Егорова Наталья Павловна", teacherIds["Егорова Наталья Павловна"]);
-                InsertUser(conn, transaction, "teacher_volkov", "TeachMuse06", "Teacher", "Волков Роман Андреевич", teacherIds["Волков Роман Андреевич"]);
+                InsertUser(conn, transaction, "admin", "admin1", "Admin", "Главный администратор", null);
+                InsertUser(conn, transaction, "employee", "employee", "Employee", "Марина Андреевна Белова", null);
+                InsertUser(conn, transaction, "operator", "operator", "Employee", "Кирилл Сергеевич Грачев", null);
+                InsertUser(conn, transaction, "teacher1", "teach1", "Teacher", "Смирнова Ольга Викторовна", teacherIds["Смирнова Ольга Викторовна"]);
+                InsertUser(conn, transaction, "teacher2", "teach2", "Teacher", "Кузнецов Дмитрий Игоревич", teacherIds["Кузнецов Дмитрий Игоревич"]);
+                InsertUser(conn, transaction, "teacher3", "teach3", "Teacher", "Мельникова Анна Сергеевна", teacherIds["Мельникова Анна Сергеевна"]);
+                InsertUser(conn, transaction, "teacher4", "teach4", "Teacher", "Фролов Алексей Петрович", teacherIds["Фролов Алексей Петрович"]);
+                InsertUser(conn, transaction, "teacher5", "teach5", "Teacher", "Егорова Наталья Павловна", teacherIds["Егорова Наталья Павловна"]);
+                InsertUser(conn, transaction, "teacher6", "teach6", "Teacher", "Волков Роман Андреевич", teacherIds["Волков Роман Андреевич"]);
 
                 var exhibitIds = new Dictionary<string, int>();
                 exhibitIds["MU-001"] = InsertExhibit(conn, transaction, "MU-001", "Бронзовый подсвечник XIX века", "Металл", "Бронза", "Отличное", "Выставочный зал", 18500m, new DateTime(2024, 3, 14), "Марина Андреевна Белова", "Передача из частной коллекции", 1884);
@@ -229,10 +342,10 @@ namespace MuseumAccountingSystem.Services
                 InsertIssue(conn, transaction, exhibitIds["MU-010"], teacherIds["Егорова Наталья Павловна"], new DateTime(2026, 5, 6), new DateTime(2026, 5, 30), null, "Оформление экспозиции ко Дню университета", "Выдан");
                 InsertIssue(conn, transaction, exhibitIds["MU-012"], teacherIds["Волков Роман Андреевич"], new DateTime(2026, 4, 7), new DateTime(2026, 4, 21), new DateTime(2026, 4, 20), "Подготовка реставрационного отчета", "Возвращен");
 
-                InsertLog(conn, transaction, "museum_admin", "Admin", "Создание", "Система", "Первичная инициализация", "Выполнен автоматический seed базы данных");
-                InsertLog(conn, transaction, "museum_employee", "Employee", "Выдача", "Экспонат", "Бронзовый подсвечник XIX века", "Выдан для открытой лекции");
-                InsertLog(conn, transaction, "museum_operator", "Employee", "Добавление", "Экспонат", "Макет учебного корпуса", "Экспонат внесен в учетную систему");
-                InsertLog(conn, transaction, "teacher_egorova", "Teacher", "Просмотр", "Журнал", "Собственные выдачи", "Пользователь открыл журнал выдач");
+                InsertLog(conn, transaction, "admin", "Admin", "Создание", "Система", "Первичная инициализация", "Выполнен автоматический seed базы данных");
+                InsertLog(conn, transaction, "employee", "Employee", "Выдача", "Экспонат", "Бронзовый подсвечник XIX века", "Выдан для открытой лекции");
+                InsertLog(conn, transaction, "operator", "Employee", "Добавление", "Экспонат", "Макет учебного корпуса", "Экспонат внесен в учетную систему");
+                InsertLog(conn, transaction, "teacher1", "Teacher", "Просмотр", "Журнал", "Собственные выдачи", "Пользователь открыл журнал выдач");
 
                 using (var versionCmd = new NpgsqlCommand("UPDATE data_version SET version = 1 WHERE id = 1", conn, transaction))
                 {
@@ -276,18 +389,20 @@ namespace MuseumAccountingSystem.Services
         private int InsertExhibit(NpgsqlConnection conn, NpgsqlTransaction transaction, string inventoryNumber, string name, string category, string material, string condition, string location, decimal cost, DateTime? lastRestorationDate, string responsiblePerson, string source, int? yearOfOrigin)
         {
             const string sql = @"INSERT INTO exhibits
-                                (inventory_number, name, category, material, condition, location, photo_paths, cost, last_restoration_date, responsible_person, source, year_of_origin, created_date, data_version)
+                                (inventory_number, name, category, material, condition, location_id, photo_paths, cost, last_restoration_date, responsible_person, source, year_of_origin, created_date, data_version)
                                 VALUES
-                                (@inventory_number, @name, @category, @material, @condition, @location, '[]', @cost, @last_restoration_date, @responsible_person, @source, @year_of_origin, @created_date, 0)
+                                (@inventory_number, @name, @category, @material, @condition, @location_id, '[]', @cost, @last_restoration_date, @responsible_person, @source, @year_of_origin, @created_date, 0)
                                 RETURNING id";
             using (var cmd = new NpgsqlCommand(sql, conn, transaction))
             {
+                int locationId = GetOrCreateLocationId(conn, transaction, location);
+
                 cmd.Parameters.AddWithValue("@inventory_number", inventoryNumber);
                 cmd.Parameters.AddWithValue("@name", name);
                 cmd.Parameters.AddWithValue("@category", (object)category ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@material", (object)material ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@condition", (object)condition ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@location", (object)location ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@location_id", locationId);
                 cmd.Parameters.AddWithValue("@cost", cost);
                 cmd.Parameters.AddWithValue("@last_restoration_date", (object)lastRestorationDate ?? DBNull.Value);
                 cmd.Parameters.AddWithValue("@responsible_person", (object)responsiblePerson ?? DBNull.Value);
@@ -465,6 +580,90 @@ namespace MuseumAccountingSystem.Services
             return JsonConvert.SerializeObject(paths);
         }
 
+        private bool TableColumnExists(NpgsqlConnection conn, string tableName, string columnName)
+        {
+            string sql = @"
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_name = @table_name
+                  AND column_name = @column_name
+                LIMIT 1";
+
+            using (var cmd = new NpgsqlCommand(sql, conn))
+            {
+                cmd.Parameters.AddWithValue("@table_name", tableName);
+                cmd.Parameters.AddWithValue("@column_name", columnName);
+                return cmd.ExecuteScalar() != null;
+            }
+        }
+
+        private int GetOrCreateLocationId(NpgsqlConnection conn, NpgsqlTransaction transaction, string locationName)
+        {
+            string normalizedLocation = string.IsNullOrWhiteSpace(locationName) ? "Музей" : locationName.Trim();
+
+            const string selectSql = "SELECT id FROM locations WHERE name = @name";
+            using (var cmd = new NpgsqlCommand(selectSql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@name", normalizedLocation);
+                var existingId = cmd.ExecuteScalar();
+                if (existingId != null && existingId != DBNull.Value)
+                {
+                    return Convert.ToInt32(existingId);
+                }
+            }
+
+            const string insertSql = @"INSERT INTO locations (name) VALUES (@name) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id";
+            using (var cmd = new NpgsqlCommand(insertSql, conn, transaction))
+            {
+                cmd.Parameters.AddWithValue("@name", normalizedLocation);
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        public int? GetLocationIdByName(string locationName)
+        {
+            try
+            {
+                using (var conn = new NpgsqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string sql = "SELECT id FROM locations WHERE name = @name";
+                    using (var cmd = new NpgsqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@name", string.IsNullOrWhiteSpace(locationName) ? "Музей" : locationName.Trim());
+                        var result = cmd.ExecuteScalar();
+                        return result == null || result == DBNull.Value ? (int?)null : Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public string GetLocationNameById(int locationId)
+        {
+            try
+            {
+                using (var conn = new NpgsqlConnection(connectionString))
+                {
+                    conn.Open();
+                    string sql = "SELECT name FROM locations WHERE id = @id";
+                    using (var cmd = new NpgsqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@id", locationId);
+                        var result = cmd.ExecuteScalar();
+                        return result == null || result == DBNull.Value ? null : Convert.ToString(result);
+                    }
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public List<Exhibit> GetAllExhibits()
         {
             var exhibits = new List<Exhibit>();
@@ -472,10 +671,12 @@ namespace MuseumAccountingSystem.Services
             {
                 conn.Open();
                 string sql = @"SELECT e.id, e.inventory_number, e.name, e.category, e.material, e.condition, 
-                               e.location, e.photo_paths, e.created_date, e.cost, e.last_restoration_date,
+                               e.location_id, l.name as location_name, e.photo_paths, e.created_date, e.cost, e.last_restoration_date,
                                e.responsible_person, e.source, e.year_of_origin, e.data_version,
                                CAST(CASE WHEN EXISTS(SELECT 1 FROM issues i WHERE i.exhibit_id = e.id AND i.status = 'Выдан') THEN 1 ELSE 0 END AS INTEGER) as is_issued_int
-                               FROM exhibits e ORDER BY e.inventory_number";
+                               FROM exhibits e
+                               LEFT JOIN locations l ON l.id = e.location_id
+                               ORDER BY e.inventory_number";
                 using (var cmd = new NpgsqlCommand(sql, conn))
                 using (var reader = cmd.ExecuteReader())
                 {
@@ -489,16 +690,17 @@ namespace MuseumAccountingSystem.Services
                             Category = reader.IsDBNull(3) ? null : reader.GetString(3),
                             Material = reader.IsDBNull(4) ? null : reader.GetString(4),
                             Condition = reader.IsDBNull(5) ? "В наличии" : reader.GetString(5),
-                            Location = reader.IsDBNull(6) ? null : reader.GetString(6),
-                            PhotoPaths = ParsePhotoPaths(reader.IsDBNull(7) ? null : reader.GetString(7)),
-                            CreatedDate = reader.IsDBNull(8) ? DateTime.Now : reader.GetDateTime(8),
-                            Cost = reader.IsDBNull(9) ? 0 : reader.GetDecimal(9),
-                            LastRestorationDate = reader.IsDBNull(10) ? null : (DateTime?)reader.GetDateTime(10),
-                            ResponsiblePerson = reader.IsDBNull(11) ? null : reader.GetString(11),
-                            Source = reader.IsDBNull(12) ? null : reader.GetString(12),
-                            YearOfOrigin = reader.IsDBNull(13) ? null : (int?)reader.GetInt32(13),
-                            DataVersion = reader.IsDBNull(14) ? 0 : reader.GetInt32(14),
-                            CurrentStatus = reader.GetInt32(15) == 1 ? "Выдан" : "В наличии"
+                            LocationId = reader.IsDBNull(6) ? (int?)null : reader.GetInt32(6),
+                            Location = reader.IsDBNull(7) ? null : reader.GetString(7),
+                            PhotoPaths = ParsePhotoPaths(reader.IsDBNull(8) ? null : reader.GetString(8)),
+                            CreatedDate = reader.IsDBNull(9) ? DateTime.Now : reader.GetDateTime(9),
+                            Cost = reader.IsDBNull(10) ? 0 : reader.GetDecimal(10),
+                            LastRestorationDate = reader.IsDBNull(11) ? null : (DateTime?)reader.GetDateTime(11),
+                            ResponsiblePerson = reader.IsDBNull(12) ? null : reader.GetString(12),
+                            Source = reader.IsDBNull(13) ? null : reader.GetString(13),
+                            YearOfOrigin = reader.IsDBNull(14) ? null : (int?)reader.GetInt32(14),
+                            DataVersion = reader.IsDBNull(15) ? 0 : reader.GetInt32(15),
+                            CurrentStatus = reader.GetInt32(16) == 1 ? "Выдан" : "В наличии"
                         });
                     }
                 }
@@ -511,24 +713,32 @@ namespace MuseumAccountingSystem.Services
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                string sql = @"INSERT INTO exhibits (inventory_number, name, category, material, condition, location, photo_paths, created_date, cost, last_restoration_date, responsible_person, source, year_of_origin, data_version)
-                               VALUES (@inventory_number, @name, @category, @material, @condition, @location, @photo_paths, @created_date, @cost, @last_restoration_date, @responsible_person, @source, @year_of_origin, 0)";
-                using (var cmd = new NpgsqlCommand(sql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    cmd.Parameters.AddWithValue("@inventory_number", exhibit.InventoryNumber);
-                    cmd.Parameters.AddWithValue("@name", exhibit.Name);
-                    cmd.Parameters.AddWithValue("@category", (object)exhibit.Category ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@material", (object)exhibit.Material ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@condition", exhibit.Condition ?? "В наличии");
-                    cmd.Parameters.AddWithValue("@location", exhibit.Location ?? "Музей");
-                    cmd.Parameters.AddWithValue("@photo_paths", SerializePhotoPaths(exhibit.PhotoPaths));
-                    cmd.Parameters.AddWithValue("@created_date", DateTime.Now);
-                    cmd.Parameters.AddWithValue("@cost", exhibit.Cost);
-                    cmd.Parameters.AddWithValue("@last_restoration_date", (object)exhibit.LastRestorationDate ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@responsible_person", (object)exhibit.ResponsiblePerson ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@source", (object)exhibit.Source ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@year_of_origin", (object)exhibit.YearOfOrigin ?? DBNull.Value);
-                    cmd.ExecuteNonQuery();
+                    string sql = @"INSERT INTO exhibits (inventory_number, name, category, material, condition, location_id, photo_paths, created_date, cost, last_restoration_date, responsible_person, source, year_of_origin, data_version)
+                                   VALUES (@inventory_number, @name, @category, @material, @condition, @location_id, @photo_paths, @created_date, @cost, @last_restoration_date, @responsible_person, @source, @year_of_origin, 0)";
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        string locationName = string.IsNullOrWhiteSpace(exhibit.Location) ? "Музей" : exhibit.Location;
+                        int locationId = GetOrCreateLocationId(conn, transaction, locationName);
+
+                        cmd.Parameters.AddWithValue("@inventory_number", exhibit.InventoryNumber);
+                        cmd.Parameters.AddWithValue("@name", exhibit.Name);
+                        cmd.Parameters.AddWithValue("@category", (object)exhibit.Category ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@material", (object)exhibit.Material ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@condition", exhibit.Condition ?? "В наличии");
+                        cmd.Parameters.AddWithValue("@location_id", locationId);
+                        cmd.Parameters.AddWithValue("@photo_paths", SerializePhotoPaths(exhibit.PhotoPaths));
+                        cmd.Parameters.AddWithValue("@created_date", DateTime.Now);
+                        cmd.Parameters.AddWithValue("@cost", exhibit.Cost);
+                        cmd.Parameters.AddWithValue("@last_restoration_date", (object)exhibit.LastRestorationDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@responsible_person", (object)exhibit.ResponsiblePerson ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@source", (object)exhibit.Source ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@year_of_origin", (object)exhibit.YearOfOrigin ?? DBNull.Value);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
                 }
             }
             IncrementVersion();
@@ -544,38 +754,46 @@ namespace MuseumAccountingSystem.Services
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                string getVersionSql = "SELECT COALESCE(data_version, 0) FROM exhibits WHERE id = @id";
-                using (var getCmd = new NpgsqlCommand(getVersionSql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    getCmd.Parameters.AddWithValue("@id", exhibit.Id);
-                    var result = getCmd.ExecuteScalar();
-                    newVersion = Convert.ToInt32(result) + 1;
-                }
+                    string getVersionSql = "SELECT COALESCE(data_version, 0) FROM exhibits WHERE id = @id";
+                    using (var getCmd = new NpgsqlCommand(getVersionSql, conn, transaction))
+                    {
+                        getCmd.Parameters.AddWithValue("@id", exhibit.Id);
+                        var result = getCmd.ExecuteScalar();
+                        newVersion = Convert.ToInt32(result) + 1;
+                    }
 
-                string sql = @"UPDATE exhibits SET 
+                    string sql = @"UPDATE exhibits SET 
                     inventory_number = @inventory_number, name = @name, category = @category, 
-                    material = @material, condition = @condition, location = @location,
+                    material = @material, condition = @condition, location_id = @location_id,
                     photo_paths = @photo_paths, cost = @cost, last_restoration_date = @last_restoration_date,
                     responsible_person = @responsible_person, source = @source, year_of_origin = @year_of_origin,
                     data_version = @data_version
                     WHERE id = @id";
-                using (var cmd = new NpgsqlCommand(sql, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", exhibit.Id);
-                    cmd.Parameters.AddWithValue("@inventory_number", exhibit.InventoryNumber);
-                    cmd.Parameters.AddWithValue("@name", exhibit.Name);
-                    cmd.Parameters.AddWithValue("@category", (object)exhibit.Category ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@material", (object)exhibit.Material ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@condition", exhibit.Condition ?? "В наличии");
-                    cmd.Parameters.AddWithValue("@location", exhibit.Location ?? "Музей");
-                    cmd.Parameters.AddWithValue("@photo_paths", SerializePhotoPaths(exhibit.PhotoPaths));
-                    cmd.Parameters.AddWithValue("@cost", exhibit.Cost);
-                    cmd.Parameters.AddWithValue("@last_restoration_date", (object)exhibit.LastRestorationDate ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@responsible_person", (object)exhibit.ResponsiblePerson ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@source", (object)exhibit.Source ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@year_of_origin", (object)exhibit.YearOfOrigin ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@data_version", newVersion);
-                    cmd.ExecuteNonQuery();
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        string locationName = string.IsNullOrWhiteSpace(exhibit.Location) ? "Музей" : exhibit.Location;
+                        int locationId = GetOrCreateLocationId(conn, transaction, locationName);
+
+                        cmd.Parameters.AddWithValue("@id", exhibit.Id);
+                        cmd.Parameters.AddWithValue("@inventory_number", exhibit.InventoryNumber);
+                        cmd.Parameters.AddWithValue("@name", exhibit.Name);
+                        cmd.Parameters.AddWithValue("@category", (object)exhibit.Category ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@material", (object)exhibit.Material ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@condition", exhibit.Condition ?? "В наличии");
+                        cmd.Parameters.AddWithValue("@location_id", locationId);
+                        cmd.Parameters.AddWithValue("@photo_paths", SerializePhotoPaths(exhibit.PhotoPaths));
+                        cmd.Parameters.AddWithValue("@cost", exhibit.Cost);
+                        cmd.Parameters.AddWithValue("@last_restoration_date", (object)exhibit.LastRestorationDate ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@responsible_person", (object)exhibit.ResponsiblePerson ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@source", (object)exhibit.Source ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@year_of_origin", (object)exhibit.YearOfOrigin ?? DBNull.Value);
+                        cmd.Parameters.AddWithValue("@data_version", newVersion);
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
                 }
             }
             IncrementVersion();
@@ -585,33 +803,20 @@ namespace MuseumAccountingSystem.Services
             }
         }
 
-        public void DeleteExhibit(int id, User currentUser = null)
+        public void DeleteExhibit(int exhibitId, User currentUser)
         {
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
 
-                var exhibit = GetAllExhibits().FirstOrDefault(e => e.Id == id);
-                if (currentUser != null && exhibit != null)
-                {
-                    AddLog(currentUser, "Удаление", "Экспонат", exhibit.Name, $"Инв. номер: {exhibit.InventoryNumber}");
-                }
+                string sql = "DELETE FROM exhibits WHERE id = @id";
 
-                string sql = "DELETE FROM issues WHERE exhibit_id = @id";
                 using (var cmd = new NpgsqlCommand(sql, conn))
                 {
-                    cmd.Parameters.AddWithValue("@id", id);
-                    cmd.ExecuteNonQuery();
-                }
-
-                sql = "DELETE FROM exhibits WHERE id = @id";
-                using (var cmd = new NpgsqlCommand(sql, conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@id", exhibitId);
                     cmd.ExecuteNonQuery();
                 }
             }
-            IncrementVersion();
         }
 
         public List<Teacher> GetAllTeachers()
@@ -1047,47 +1252,62 @@ namespace MuseumAccountingSystem.Services
             return issues;
         }
 
-        public void IssueExhibit(int exhibitId, int teacherId, DateTime plannedReturnDate, string purpose, User currentUser = null)
+        public void IssueExhibit(int exhibitId, int teacherId, DateTime returnDate, string purpose, User currentUser)
         {
             using (var conn = new NpgsqlConnection(connectionString))
             {
                 conn.Open();
-                int newVersion = 1;
-                string getVersionSql = "SELECT COALESCE(data_version, 0) FROM exhibits WHERE id = @id";
-                using (var getCmd = new NpgsqlCommand(getVersionSql, conn))
+
+                string checkSql = @"
+            SELECT COUNT(*)
+            FROM issues
+            WHERE exhibit_id = @exhibitId
+            AND status = 'Выдан'";
+
+                using (var checkCmd = new NpgsqlCommand(checkSql, conn))
                 {
-                    getCmd.Parameters.AddWithValue("@id", exhibitId);
-                    newVersion = Convert.ToInt32(getCmd.ExecuteScalar()) + 1;
+                    checkCmd.Parameters.AddWithValue("@exhibitId", exhibitId);
+
+                    if (Convert.ToInt32(checkCmd.ExecuteScalar()) > 0)
+                    {
+                        throw new Exception("Экспонат уже выдан преподавателю");
+                    }
                 }
 
-                string updateExhibitSql = "UPDATE exhibits SET data_version = @data_version WHERE id = @id";
-                using (var updateCmd = new NpgsqlCommand(updateExhibitSql, conn))
+                using (var transaction = conn.BeginTransaction())
                 {
-                    updateCmd.Parameters.AddWithValue("@id", exhibitId);
-                    updateCmd.Parameters.AddWithValue("@data_version", newVersion);
-                    updateCmd.ExecuteNonQuery();
-                }
+                    string sql = @"
+                INSERT INTO issues
+                (
+                    exhibit_id,
+                    teacher_id,
+                    issue_date,
+                    planned_return_date,
+                    status,
+                    purpose
+                )
+                VALUES
+                (
+                    @exhibitId,
+                    @teacherId,
+                    @issueDate,
+                    @returnDate,
+                    'Выдан',
+                    @purpose
+                )";
 
-                string sql = @"INSERT INTO issues (exhibit_id, teacher_id, issue_date, planned_return_date, purpose, status, data_version)
-                               VALUES (@exhibit_id, @teacher_id, @issue_date, @planned_return_date, @purpose, 'Выдан', 0)";
-                using (var cmd = new NpgsqlCommand(sql, conn))
-                {
-                    cmd.Parameters.AddWithValue("@exhibit_id", exhibitId);
-                    cmd.Parameters.AddWithValue("@teacher_id", teacherId);
-                    cmd.Parameters.AddWithValue("@issue_date", DateTime.Now);
-                    cmd.Parameters.AddWithValue("@planned_return_date", plannedReturnDate);
-                    cmd.Parameters.AddWithValue("@purpose", purpose ?? "");
-                    cmd.ExecuteNonQuery();
-                }
-            }
-            IncrementVersion();
-            if (currentUser != null)
-            {
-                var exhibit = GetAllExhibits().FirstOrDefault(e => e.Id == exhibitId);
-                var teacher = GetAllTeachers().FirstOrDefault(t => t.Id == teacherId);
-                if (exhibit != null && teacher != null)
-                {
-                    AddLog(currentUser, "Выдача", "Экспонат", exhibit.Name, $"Преподаватель: {teacher.FullName}, дата возврата: {plannedReturnDate:dd.MM.yyyy}");
+                    using (var cmd = new NpgsqlCommand(sql, conn, transaction))
+                    {
+                        cmd.Parameters.AddWithValue("@exhibitId", exhibitId);
+                        cmd.Parameters.AddWithValue("@teacherId", teacherId);
+                        cmd.Parameters.AddWithValue("@issueDate", DateTime.Now);
+                        cmd.Parameters.AddWithValue("@returnDate", returnDate);
+                        cmd.Parameters.AddWithValue("@purpose", purpose ?? "");
+
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    transaction.Commit();
                 }
             }
         }

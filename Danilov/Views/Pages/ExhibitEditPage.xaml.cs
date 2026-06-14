@@ -90,13 +90,23 @@ namespace MuseumAccountingSystem.Views.Pages
                 else
                     cmbCondition.SelectedIndex = 0;
 
-                if (!string.IsNullOrEmpty(ex.Location))
+                string locationName = ex.Location;
+                if (ex.LocationId.HasValue)
+                {
+                    string resolvedLocation = dbService.GetLocationNameById(ex.LocationId.Value);
+                    if (!string.IsNullOrEmpty(resolvedLocation))
+                    {
+                        locationName = resolvedLocation;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(locationName))
                 {
                     bool found = false;
                     for (int i = 0; i < cmbLocation.Items.Count; i++)
                     {
                         ComboBoxItem item = cmbLocation.Items[i] as ComboBoxItem;
-                        if (item != null && item.Content.ToString() == ex.Location)
+                        if (item != null && item.Content.ToString() == locationName)
                         {
                             cmbLocation.SelectedIndex = i;
                             found = true;
@@ -383,6 +393,7 @@ namespace MuseumAccountingSystem.Views.Pages
                 location = cmbLocation.Text;
             }
             exhibit.Location = location;
+            exhibit.LocationId = dbService.GetLocationIdByName(location);
 
             exhibit.PhotoPaths = copiedPhotoPaths;
 
